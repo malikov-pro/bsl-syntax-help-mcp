@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+  xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+
+  <parent>
+    <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
+    <artifactId>bom</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+    <relativePath>./bom/pom.xml</relativePath>
+  </parent>
+
+  <artifactId>parent</artifactId>
+  <packaging>pom</packaging>
+
+  <name>BSL syntax-help export for EDT</name>
+
+  <modules>
+    <module>targets</module>
+    <module>bundles</module>
+    <module>features</module>
+    <module>repositories</module>
+  </modules>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-p2-repository-plugin</artifactId>
+          <configuration>
+            <repositoryName>${project.name} Repository</repositoryName>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>target-platform-configuration</artifactId>
+          <configuration>
+            <dependency-resolution>
+              <extraRequirements>
+                <requirement>
+                  <type>eclipse-plugin</type>
+                  <id>org.apache.felix.scr</id>
+                  <versionRange>0.0.0</versionRange>
+                </requirement>
+                <requirement>
+                  <type>eclipse-plugin</type>
+                  <id>org.apache.aries.spifly.dynamic.bundle</id>
+                  <versionRange>1.3.7</versionRange>
+                </requirement>
+                <requirement>
+                  <type>eclipse-plugin</type>
+                  <id>com._1c.g5.wiring</id>
+                  <versionRange>0.0.0</versionRange>
+                </requirement>
+              </extraRequirements>
+            </dependency-resolution>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+</project>

@@ -9,3 +9,5 @@ docker/mcp/data/
 .python-version
 *.pyc
 .DS_Store
+**/target/
+edt-syntax-help-export/connector/bom/edt-credentials.env

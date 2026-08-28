@@ -1,0 +1,167 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project
+  xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd"
+  xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance">
+  <modelVersion>4.0.0</modelVersion>
+
+  <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
+  <artifactId>bom</artifactId>
+  <version>0.1.0-SNAPSHOT</version>
+  <packaging>pom</packaging>
+
+  <name>BOM</name>
+
+  <prerequisites>
+    <maven>3.9.4</maven>
+  </prerequisites>
+
+  <properties>
+    <tycho.version>4.0.5</tycho.version>
+    <tycho.extras.version>4.0.5</tycho.extras.version>
+
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+    <maven.compiler.source>17</maven.compiler.source>
+    <maven.compiler.target>17</maven.compiler.target>
+    <maven.compiler.release>17</maven.compiler.release>
+
+    <maven.build.timestamp.format>'v'yyyyMMddHHmmss</maven.build.timestamp.format>
+    <qualifier>${maven.build.timestamp}</qualifier>
+    <forceContextQualifier>${maven.build.timestamp}</forceContextQualifier>
+
+    <tycho.localArtifacts>ignore</tycho.localArtifacts>
+    <tycho.resolver.classic>false</tycho.resolver.classic>
+    <tycho.baseline.skip>true</tycho.baseline.skip>
+
+    <!-- default = EDT 2025.2; override with -Pedt-2026.1 -->
+    <edt.target.artifact>default</edt.target.artifact>
+  </properties>
+
+  <profiles>
+    <profile>
+      <id>edt-2026.1</id>
+      <properties>
+        <edt.target.artifact>edt-2026.1</edt.target.artifact>
+      </properties>
+    </profile>
+  </profiles>
+
+  <build>
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>target-platform-configuration</artifactId>
+          <version>${tycho.version}</version>
+          <configuration>
+            <executionEnvironment>JavaSE-17</executionEnvironment>
+            <target>
+              <artifact>
+                <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
+                <artifactId>${edt.target.artifact}</artifactId>
+                <version>0.1.0-SNAPSHOT</version>
+              </artifact>
+            </target>
+            <dependency-resolution>
+              <extraRequirements>
+                <requirement>
+                  <type>eclipse-plugin</type>
+                  <id>javax.annotation</id>
+                  <versionRange>0.0.0</versionRange>
+                </requirement>
+                <requirement>
+                  <type>eclipse-plugin</type>
+                  <id>com._1c.g5.wiring</id>
+                  <versionRange>0.0.0</versionRange>
+                </requirement>
+              </extraRequirements>
+            </dependency-resolution>
+            <environments>
+              <environment>
+                <os>win32</os>
+                <ws>win32</ws>
+                <arch>x86_64</arch>
+              </environment>
+              <environment>
+                <os>linux</os>
+                <ws>gtk</ws>
+                <arch>x86_64</arch>
+              </environment>
+              <environment>
+                <os>macosx</os>
+                <ws>cocoa</ws>
+                <arch>x86_64</arch>
+              </environment>
+            </environments>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-maven-plugin</artifactId>
+          <version>${tycho.version}</version>
+          <extensions>true</extensions>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-compiler-plugin</artifactId>
+          <version>${tycho.version}</version>
+          <configuration>
+            <encoding>UTF-8</encoding>
+            <strictCompilerTarget>true</strictCompilerTarget>
+            <useProjectSettings>true</useProjectSettings>
+            <showWarnings>true</showWarnings>
+            <showDeprecation>true</showDeprecation>
+            <verbose>true</verbose>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-source-plugin</artifactId>
+          <version>${tycho.version}</version>
+          <configuration>
+            <archive>
+              <addMavenDescriptor>false</addMavenDescriptor>
+            </archive>
+          </configuration>
+          <executions>
+            <execution>
+              <goals>
+                <goal>plugin-source</goal>
+              </goals>
+            </execution>
+          </executions>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-packaging-plugin</artifactId>
+          <version>${tycho.version}</version>
+          <configuration>
+            <format>'v'yyyyMMddHHmmss</format>
+            <forceContextQualifier>${maven.build.timestamp}</forceContextQualifier>
+          </configuration>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-p2-plugin</artifactId>
+          <version>${tycho.version}</version>
+        </plugin>
+        <plugin>
+          <groupId>org.eclipse.tycho</groupId>
+          <artifactId>tycho-p2-repository-plugin</artifactId>
+          <version>${tycho.version}</version>
+          <configuration>
+            <repositoryName>${project.name} Repository</repositoryName>
+          </configuration>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+
+    <plugins>
+      <plugin>
+        <groupId>org.eclipse.tycho</groupId>
+        <artifactId>tycho-maven-plugin</artifactId>
+        <extensions>true</extensions>
+      </plugin>
+    </plugins>
+  </build>
+</project>

@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<?eclipse version="3.4"?>
+<plugin>
+   <extension
+         point="org.eclipse.ui.preferencePages">
+      <page
+            class="com.github.malikovpro.dt.bsl.syntaxhelp.ui.SyntaxHelpPreferencePage"
+            id="com.github.malikov-pro.dt.bsl.syntaxhelp.preferencePage"
+            name="%pageName">
+      </page>
+   </extension>
+   <extension
+         point="org.eclipse.core.runtime.preferences">
+      <initializer
+            class="com.github.malikovpro.dt.bsl.syntaxhelp.ui.SyntaxHelpPreferenceInitializer">
+      </initializer>
+   </extension>
+</plugin>
