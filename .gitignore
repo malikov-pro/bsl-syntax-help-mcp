@@ -1,0 +1,11 @@
+_edt/
+/_source/
+docker/giga/hf-cache/
+docker/mcp/data/
+.env
+*.sqlite
+**/__pycache__/
+.venv
+.python-version
+*.pyc
+.DS_Store

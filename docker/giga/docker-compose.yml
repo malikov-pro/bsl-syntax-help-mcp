@@ -1,0 +1,57 @@
+name: syntax-help-giga
+
+services:
+  giga-embeddings:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: syntax-help-giga:local
+    container_name: giga-embeddings
+    restart: unless-stopped
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      MODEL_ID: ${MODEL_ID:-ai-sage/Giga-Embeddings-instruct}
+      PORT: ${PORT:-7997}
+      HF_TOKEN: ${HF_TOKEN:-}
+      HF_HOME: /cache/huggingface
+      HUGGINGFACE_HUB_CACHE: /cache/huggingface
+      TRANSFORMERS_CACHE: /cache/huggingface
+      HF_HUB_DISABLE_SYMLINKS_WARNING: "1"
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    ports:
+      - "127.0.0.1:7997:7997"
+    volumes:
+      - ./hf-cache:/cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://127.0.0.1:7997/health', timeout=5).read()",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 20
+      start_period: 30m
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    networks:
+      - syntax-help
+
+networks:
+  syntax-help:
+    external: true
