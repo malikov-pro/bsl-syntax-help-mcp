@@ -91,8 +91,61 @@ curl -sS http://127.0.0.1:8004/ingest/commit \
 curl -sS http://127.0.0.1:8004/status
 ```
 
-Поиск с `platform_version` `8.3.23` (слой членства `base`). Гибрид FTS +
+Поиск с `platform_version` `8.3.23` — версии 8.3.8–8.3.24 обслуживает слой
+`base`. Гибрид FTS +
 эмбеддинги работает, когда Giga здоров; в `degraded` остаётся FTS-only.
+
+## Замена модели эмбеддингов (например, на BGE-M3)
+
+Модель эмбеддингов — не константа проекта: контейнер `docker/giga` грузит через
+SentenceTransformers любой HF-идентификатор, а MCP общается с ним по
+OpenAI-совместимому API. Пример перехода на `BAAI/bge-m3` (dense, размерность
+**1024**, ~570 млн параметров — хватает скромной GPU; веса ~2.3 ГБ в
+`hf-cache/`):
+
+1. `docker/giga/.env`:
+
+   ```bash
+   MODEL_ID=BAAI/bge-m3
+   ```
+
+   Пересоздайте контейнер (`docker compose -f docker/giga/docker-compose.yml up -d`).
+   Первый старт скачает веса в `docker/giga/hf-cache/`; `/health` покажет
+   загруженную модель.
+
+2. Размерность изменилась (1024 вместо 2048) — правьте константу в
+   `docker/mcp/app/config.py` и пересоберите образ:
+
+   ```python
+   EXPECTED_EMBED_DIM = 1024
+   ```
+
+   ```bash
+   docker compose -f docker/mcp/docker-compose.yml up -d --build
+   ```
+
+   Если берёте модель той же размерности 2048 — этот шаг не нужен.
+
+3. `docker/mcp/.env` — имя модели для запросов и пустой префикс запроса
+   (BGE-M3 не инструктивная, instruct-префикс Giga ей не подходит):
+
+   ```bash
+   EMBED_MODEL=bge-m3
+   EMBED_QUERY_PREFIX=
+   ```
+
+4. Старые векторы новой модели не соответствуют — индекс векторов нужно
+   перестроить с нуля: `DELETE /admin/database` с телом `{"confirm":true}`
+   (или остановите MCP и удалите `docker/mcp/data/help.sqlite*`).
+
+5. Выгрузите слои заново из плагина EDT («Выгрузить») и дождитесь, пока в
+   `/status` `embed_queue.pending` и `error` упадут в ноль.
+
+Пока очередь не доиграла, поиск отвечает FTS-only. Перемешивать векторы двух
+моделей нельзя: запрос кодируется новой моделью, а старые векторы документов
+останутся в базе — KNN-ранжирование будет мусорным, поэтому только полная
+перестройка. FTS при смене модели не страдает.
+
 
 ## Перенос SQLite-корпуса между машинами
 
@@ -273,6 +326,10 @@ MCP (`docker/mcp/.env`): `INGEST_TOKEN`, `MCP_TOKEN`,
 
 Giga (`docker/giga/.env`): `MODEL_ID`, опционально `HF_TOKEN`. Веса живут
 в томе Giga, в образ MCP не попадают.
+
+## Статьи о плагине
+
+[Синтакс-помощник 1С для нейросетей](https://infostart.ru/1c/articles/2777511/) на ![Инфостарт](https://infostart.ru/bitrix/templates/sandbox_empty/assets/tpl/abo/img/logo.svg)
 
 ## Разработчикам
 
