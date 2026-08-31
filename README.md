@@ -1,6 +1,17 @@
 # BSL syntax-help MCP
 
-Docker services that store 1C platform syntax help in SQLite and expose Comol-style MCP tools (`docinfo`, `docsearch`). The EDT plugin dumps the syntax helper into the MCP container over HTTP.
+[![GitHub all releases](https://img.shields.io/github/downloads/malikov-pro/bsl-syntax-help-mcp/total)](https://github.com/malikov-pro/bsl-syntax-help-mcp/releases)
+[![License: AGPL-3.0](https://img.shields.io/badge/license-AGPL--3.0-blue)](LICENSE)
+
+[![Непрерывная интеграция](https://github.com/malikov-pro/bsl-syntax-help-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/malikov-pro/bsl-syntax-help-mcp/actions/workflows/ci.yml)
+[![Релиз](https://github.com/malikov-pro/bsl-syntax-help-mcp/actions/workflows/release.yml/badge.svg)](https://github.com/malikov-pro/bsl-syntax-help-mcp/actions/workflows/release.yml)
+[![Deploy Update Site](https://github.com/malikov-pro/bsl-syntax-help-mcp/actions/workflows/deploy-update-site.yml/badge.svg)](https://github.com/malikov-pro/bsl-syntax-help-mcp/actions/workflows/deploy-update-site.yml)
+
+[![Quality Gate Status](https://sonarcloud.io/api/project_badges/measure?project=malikov-pro_bsl-syntax-help-mcp&metric=alert_status)](https://sonarcloud.io/summary/new_code?id=malikov-pro_bsl-syntax-help-mcp)
+[![Bugs](https://sonarcloud.io/api/project_badges/measure?project=malikov-pro_bsl-syntax-help-mcp&metric=bugs)](https://sonarcloud.io/summary/new_code?id=malikov-pro_bsl-syntax-help-mcp)
+[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=malikov-pro_bsl-syntax-help-mcp&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=malikov-pro_bsl-syntax-help-mcp)
+
+Docker services that store 1C platform syntax help in SQLite and expose Comol-style MCP tools (`docinfo`, `docsearch`). The EDT plugin dumps the syntax helper into the MCP container over HTTP. Потоки данных — в [CHECK-FLOWS.md](CHECK-FLOWS.md).
 
 ## Layout
 
@@ -183,22 +194,30 @@ Do not commit real tokens. Do not run this MCP next to HelpSearchServer: the too
 
 Tycho layout lives in `edt-syntax-help-export/connector/` (bom / bundles / features / repositories / targets). Default target is EDT **2025.2** + Eclipse **2025-12**; `-Pedt-2026.1` switches the p2 URL. Details: [edt-syntax-help-export/README.md](edt-syntax-help-export/README.md).
 
-```bash
-cd edt-syntax-help-export
-cp connector/bom/edt-credentials.env.example connector/bom/edt-credentials.env
-# MAVEN_USERNAME / MAVEN_CENTRAL_TOKEN — учётка edt.1c.ru, файл не коммитить
+Install from the GitHub Pages update site:
 
-bash compile.sh
-# или: bash compile.sh --profile edt-2026.1
+1. `Справка` → `Установить новое ПО`.
+2. URL:
+
+```
+https://malikov-pro.github.io/bsl-syntax-help-mcp/
 ```
 
-Install into a **closed** EDT (p2 director, auto-detects `~/.local/share/1C/1cedtstart/installations/1C_EDT*`):
+3. `Добавить`.
+4. Check `BSL syntax-help export for EDT`.
+5. Keep **enabled** `Обращаться во время инсталляции ко всем сайтам обновления для поиска требуемого ПО`.
+6. `Далее` → `Готово`, then restart EDT.
 
-```bash
-bash scripts/deploy-edt.sh
-```
+### Установка из архива (без сайта обновления)
 
-From the zip by hand: `Справка` → `Установить новое ПО` → `Добавить` → `Архив`. **Do not enable** `Обращаться во время инсталляции ко всем сайтам обновления…` — p2 will hit `services.1c.dev`, fail auth, then report `No repository found containing`.
+1. Скачайте zip со страницы [Releases](https://github.com/malikov-pro/bsl-syntax-help-mcp/releases) — файл `…repository-<версия>.zip`.
+2. `Справка` → `Установить новое ПО` → `Добавить` → `Архив` → укажите скачанный zip.
+3. **Снимите** флажок `Обращаться во время инсталляции ко всем сайтам обновления…` — иначе p2 лезет на `services.1c.dev` (ошибка аутентификации) и не находит локальные артефакты (`No repository found containing`).
+4. Выберите `BSL syntax-help export for EDT` → `Далее` → `Готово` → перезапустите EDT.
+
+A closed-EDT p2 director install still works: `bash scripts/deploy-edt.sh` (из `edt-syntax-help-export/`).
+
+The Pages site is published by `.github/workflows/deploy-update-site.yml` (пуш тега релиза, событие «релиз опубликован» или Actions → Run workflow); p2 лежит в корне Pages, копия на длинном пути `…/update/bsl-syntax-help-mcp/latest/` сохранена для уже установленных EDT. Repo Settings → Pages → Source: GitHub Actions, plus secrets `MAVEN_USERNAME` / `MAVEN_CENTRAL_TOKEN`.
 
 In EDT: `Окно` → `Параметры` → `Синтакс-помощник MCP` — URL `http://127.0.0.1:8004`, `INGEST_TOKEN`, layer checkboxes, then **Выгрузить**.
 
@@ -207,3 +226,13 @@ In EDT: `Окно` → `Параметры` → `Синтакс-помощник
 MCP (`docker/mcp/.env`): `INGEST_TOKEN`, `MCP_TOKEN`, `EMBED_URL=http://giga-embeddings:7997/v1`, `EMBED_MODEL=Giga-Embeddings-instruct`, `EMBED_API_KEY` (empty), `EMBED_QUERY_PREFIX` (instruct text, query side only).
 
 Giga (`docker/giga/.env`): `MODEL_ID`, optional `HF_TOKEN`. Weights stay in the Giga volume, never in the MCP image.
+
+## Разработчикам
+
+Сборка плагина (`bash compile.sh`), целевые платформы EDT, ветвление, релизы и
+Docker-сервисы — в [Руководстве разработчика](DEVELOPER.md); карта минных полей
+проекта — [CLAUDE.md](CLAUDE.md).
+
+## Лицензия
+
+[AGPL-3.0](LICENSE).

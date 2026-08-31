@@ -1,0 +1,69 @@
+# Потоки данных: выгрузка из EDT → ingest → индекс → поиск
+
+Как карточка синтакс-помощника доезжает от `PlatformDocProvider` в EDT до
+ответа MCP-инструмента `docsearch`, и почему в одних ситуациях поиск гибридный,
+а в других — только FTS.
+
+## Три независимых звена
+
+| | Плагин (EDT) | MCP-приложение (`docker/mcp`) | Эмбеддинги (`docker/giga`) |
+|---|---|---|---|
+| Что делает | Читает дерево и страницы синтакс-помощника, шлёт карточки по HTTP | Пишет SQLite (FTS5 + sqlite-vec), считает векторы запросов, отдаёт MCP | Считает векторы документов (очередь) и запросов |
+| Запускается | Человек: кнопка «Выгрузить» | Постоянно (FastAPI + FastMCP) | Постоянно, GPU |
+| Падение | выгрузка не идёт | ingest/поиск не идут | поиск деградирует до FTS-only |
+
+`depends_on` между compose-проектами нет: MCP стартует даже пока Giga ещё
+собирается или тянет веса.
+
+## Выгрузка: плагин → ingest
+
+`ExportJob` → `PlatformDocProvider.getTree()` + `loadPage()` → `IngestClient`:
+
+1. `POST /ingest/begin` `{"layer":"base"}` → `session_id` (сессии истекают по таймауту — `_expire_sessions`).
+2. `POST /ingest/batches` — батчи по ~200 карточек; карточка: `doc_id`, `layer`, `kind`, `full_name_ru`, `body_text` (HTML страницы в plaintext, `HtmlPlainText`).
+3. `POST /ingest/commit` — атомарная замена содержимого слоя + чекпоинт WAL; `POST /ingest/abort` — откат сессии.
+
+Слой (`layer`) — членство: `base` (общая часть) + версии `8.3.25`…`8.5.1`
+(`app/versions.py` ↔ чекбоксы в `Layers.java` плагина — править только парой).
+Видимость документа при поиске = `base` плюс выбранные версии платформы
+(`_visible_docs` в `search.py`).
+
+## Индекс: SQLite и очередь эмбеддингов
+
+На `commit` документ попадает в FTS5-таблицу, чанки — в очередь `embed_queue`
+(`pending`). Фоновый воркер MCP гонит очередь в Giga и пишет векторы в
+sqlite-vec (`done`). До момента `done` документ ищется только FTS'ом.
+
+- Очередь переживает рестарт: незакрытые `pending` доигрываются после старта.
+- Корпус переносится просто файлами `help.sqlite*` (README, раздел про перенос):
+  векторы документов уже внутри. Векторы *запросов* на принимающей машине всё
+  равно считает локальный Giga.
+
+## Поиск: docinfo / docsearch
+
+`docinfo(name)` — точная карточка: `lookup_document` → `_document_payload`.
+`docsearch(query)` — два ранжирования и слияние RRF (`_rrf`):
+
+1. `_fts_ranks` — FTS5 (всегда доступен);
+2. `_knn_ranks` — sqlite-vec по вектору запроса: MCP сам кодирует запрос через
+   Giga (`EMBED_QUERY_PREFIX` — instruct-префикс, только на стороне запроса).
+
+Состояния `/ready`:
+
+- `ready` — FTS поднят (гибрид работает, если Giga здоров);
+- `degraded` — Giga недоступен: остаётся FTS-only, MCP-инструменты работают;
+- `starting` / `indexing` — пустая БД или идёт пересбор FTS: 503.
+
+## Сценарии
+
+- **«Выгрузить» в EDT** — begin → батчи → commit; слой перезаписан целиком, очередь пополнилась чанками.
+- **Giga упал** — поиск продолжает отвечать (FTS), `/ready` = `degraded`, очередь копится и доиграется после возврата Giga.
+- **Смена модели эмбеддингов** — запрещена без полной переиндексации: хранимые векторы не совпадут с новыми запросами (`EXPECTED_EMBED_DIM`).
+- **Повторная выгрузка того же слоя** — commit заменяет слой атомарно; дубликатов нет.
+
+## Исходники
+
+- Контракт ingest и карточек: `docker/mcp/app/ingest.py` (`Card`), плагин `IngestClient.java`.
+- Статусы и дашборд: `docker/mcp/app/status.py`.
+- FastAPI: <https://fastapi.tiangolo.com/>, FastMCP: <https://gofastmcp.com/>
+- sqlite-vec: <https://github.com/asg017/sqlite-vec>, FTS5: <https://www.sqlite.org/fts5.html>

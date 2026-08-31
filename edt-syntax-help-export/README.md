@@ -9,7 +9,9 @@ Tycho-плагин для 1С:EDT. Читает синтакс-помощник 
 Нужны JDK **17**, Maven **3.9+**, доступ к p2 EDT (`connector/bom/edt-credentials.env`, файл в git не кладётся).
 
 ```bash
-cd edt-syntax-help-export
+# из корня репозитория (канонический путь):
+bash compile.sh
+# или отсюда:
 cp connector/bom/edt-credentials.env.example connector/bom/edt-credentials.env
 # заполните MAVEN_USERNAME / MAVEN_CENTRAL_TOKEN (учётка edt.1c.ru)
 
@@ -30,7 +32,26 @@ mvn verify -s bom/settings.xml -Dtycho.localArtifacts=ignore
 
 ## Установка в EDT
 
-EDT должна быть **закрыта**.
+1. Откройте `Справка` → `Установить новое ПО`.
+2. Введите ссылку:
+
+```
+https://malikov-pro.github.io/bsl-syntax-help-mcp/update/bsl-syntax-help-mcp/latest/
+```
+
+3. Нажмите `Добавить`.
+4. Установите флажок на `BSL syntax-help export for EDT`.
+5. Убедитесь, что установлен флажок `Обращаться во время инсталляции ко всем сайтам обновления для поиска требуемого ПО`.
+6. Нажмите `Далее` → `Готово`.
+7. Перезапустите 1С:EDT.
+
+### Установка из архива
+
+1. `Справка` → `Установить новое ПО` → `Добавить` → `Архив` → zip из `connector/repositories/…/target/`.
+2. **Снимите** флажок `Обращаться во время инсталляции ко всем сайтам обновления…`. Иначе p2 лезет на `services.1c.dev` (ошибка аутентификации) и потом не находит локальные артефакты (`No repository found containing`).
+3. Выберите `BSL syntax-help export for EDT` → `Далее` → `Готово` → перезапустите EDT.
+
+С закрытой EDT можно поставить через p2 director:
 
 ```bash
 bash scripts/deploy-edt.sh
@@ -38,13 +59,24 @@ bash scripts/deploy-edt.sh
 bash scripts/deploy-edt.sh --edt "$HOME/.local/share/1C/1cedtstart/installations/1C_EDT 2025.2/1cedt"
 ```
 
-Скрипт ставит IU `com.github.malikov-pro.dt.bsl.syntaxhelp.feature.group` через p2 director в первую найденную `~/.local/share/1C/1cedtstart/installations/1C_EDT*`.
+### Публикация сайта обновления
 
-Из архива вручную:
+Основная ссылка установки — p2 в корне GitHub Pages:
 
-1. `Справка` → `Установить новое ПО` → `Добавить` → `Архив` → zip из `target/`.
-2. **Снимите** флажок `Обращаться во время инсталляции ко всем сайтам обновления…`. Иначе p2 лезет на `services.1c.dev` (ошибка аутентификации) и потом не находит локальные артефакты (`No repository found containing`).
-3. Выберите фичу → `Далее` → `Готово` → перезапустите EDT.
+```
+https://malikov-pro.github.io/bsl-syntax-help-mcp/
+```
+
+Копия на длинном пути сохранена для уже установленных EDT (HTML-редирект p2 не понимает):
+
+```
+https://malikov-pro.github.io/bsl-syntax-help-mcp/update/bsl-syntax-help-mcp/latest/
+```
+
+Публикует workflow `deploy-update-site.yml` (пуш тега `X.Y.Z`, событие «релиз опубликован» или вручную из Actions): собирает p2 и перезаписывает обе копии. Порядок релизов — [DEVELOPER.md](../DEVELOPER.md). Нужны:
+
+1. `Settings → Pages → Source: GitHub Actions`.
+2. Секреты `MAVEN_USERNAME` / `MAVEN_CENTRAL_TOKEN` (реджестри EDT, те же, что у [bslls-connector-for-edt](https://github.com/malikov-pro/bslls-connector-for-edt)).
 
 ## Настройки
 
