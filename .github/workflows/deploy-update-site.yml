@@ -29,8 +29,9 @@ jobs:
     steps:
       - name: Актуализация
         uses: actions/checkout@v4
-        # событие release чекаутит default-ветку — собираем именно тег релиза
-        ref: ${{ github.event.release.tag_name || github.ref }}
+        with:
+          # событие release чекаутит default-ветку — собираем именно тег релиза
+          ref: ${{ github.event.release.tag_name || github.ref }}
 
       - name: Установка JDK
         uses: actions/setup-java@v4
