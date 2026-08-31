@@ -12,8 +12,8 @@
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=malikov-pro_bsl-syntax-help-mcp&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=malikov-pro_bsl-syntax-help-mcp)
 
 Docker-сервисы, которые хранят синтакс-помощник платформы 1С в SQLite и отдают
-MCP-инструменты в стиле Comol (`docinfo`, `docsearch`). Плагин для 1С:EDT
-выгружает синтакс-помощник в MCP-контейнер по HTTP.
+MCP-инструменты в стиле Comol (`docinfo`, `docsearch`, `docmembers`). Плагин для
+1С:EDT выгружает синтакс-помощник в MCP-контейнер по HTTP.
 Потоки данных — в [CHECK-FLOWS.md](CHECK-FLOWS.md).
 
 ## Состав

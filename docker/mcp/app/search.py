@@ -251,6 +251,123 @@ def _rrf(*rank_lists: list[str]) -> list[str]:
     return [doc_id for doc_id, _ in sorted(scores.items(), key=lambda item: item[1], reverse=True)]
 
 
+MEMBER_KIND_ORDER = (
+    "constructor",
+    "method",
+    "property",
+    "event",
+    "operator",
+    "literal",
+    "enum",
+    "statement",
+    "definition",
+    "value",
+    "value_set",
+    "enum_value",
+    "form_parameter",
+    "query_table",
+    "query_field",
+    "query_parameter",
+    "catalog",
+    "type",
+)
+
+
+def _kind_rank(kind: str) -> int:
+    try:
+        return MEMBER_KIND_ORDER.index(kind)
+    except ValueError:
+        return len(MEMBER_KIND_ORDER)
+
+
+def _owner_matches(row: Any, needle: str) -> bool:
+    for field in ("object_ru", "object_en"):
+        owner = row[field] or ""
+        if owner.strip().casefold() == needle:
+            return True
+    return False
+
+
+def _type_article_matches(row: Any, needle: str) -> bool:
+    for field in ("full_name_ru", "full_name_en"):
+        name = row[field] or ""
+        if name.strip().casefold() == needle:
+            return True
+    return False
+
+
+def list_type_members(
+    type_name: str,
+    platform_version: str,
+    kind: str = "",
+    limit: int = 50,
+    scope: str = "syntax",
+) -> str:
+    _require_syntax_scope(scope)
+    needle = (type_name or "").strip().casefold()
+    if not needle:
+        raise SearchError("type is required")
+    wanted_kind = (kind or "").strip().lower()
+    try:
+        limit = int(limit)
+    except (TypeError, ValueError) as exc:
+        raise SearchError("limit must be an integer") from exc
+    if limit < 1 or limit > 200:
+        raise SearchError("limit must be between 1 and 200")
+    with connect() as conn:
+        layers = committed_layers(conn)
+        try:
+            resolved = resolve_platform_version(platform_version, layers)
+        except VersionError as exc:
+            raise SearchError(str(exc), exc.loaded_layers) from exc
+        visible = _visible_docs(conn, resolved.membership_layer, platform_version)
+        owner_name = ""
+        for row in visible.values():
+            if (row["kind"] or "").lower() == "type" and _type_article_matches(row, needle):
+                owner_name = row["full_name_ru"] or row["full_name_en"] or type_name
+                break
+        owned: list[tuple[str, Any]] = []
+        for row in visible.values():
+            member_name = row["member_ru"] or row["member_en"] or ""
+            if not member_name or not _owner_matches(row, needle):
+                continue
+            if not owner_name:
+                candidate = row["object_ru"] or row["object_en"] or ""
+                if candidate.strip().casefold() == needle:
+                    owner_name = candidate
+            owned.append((member_name, row))
+        if not owned:
+            return f"No members found for type {type_name!r} at platform_version {platform_version}."
+        if wanted_kind:
+            members = [(name, row) for name, row in owned if (row["kind"] or "").lower() == wanted_kind]
+            if not members:
+                present = sorted({row["kind"] or "unknown" for _, row in owned})
+                return (
+                    f"No members with kind {wanted_kind!r} for type {type_name!r} "
+                    f"at platform_version {platform_version}."
+                    f" Available kinds: {', '.join(present)}."
+                )
+        else:
+            members = owned
+        members.sort(key=lambda item: (_kind_rank(item[1]["kind"] or ""), item[0].casefold()))
+        shown = members[:limit]
+        syntax_used = any(row["syntax"] for _, row in shown)
+        width = min(max(max(len(name) for name, _ in shown), len("member")), 28)
+        lines = [f"# {owner_name or type_name} — {len(members)} member{'s' if len(members) != 1 else ''}"]
+        header = f"{'kind':<12} {'member':<{width}}"
+        if syntax_used:
+            header += " syntax"
+        lines.append(header)
+        for name, row in shown:
+            line = f"{(row['kind'] or '-'):<12} {name:<{width}}"
+            if syntax_used:
+                line += f" {row['syntax'] or '-'}"
+            lines.append(line)
+        if len(members) > len(shown):
+            lines.append(f"... and {len(members) - len(shown)} more (raise limit, up to 200)")
+        return "\n".join(lines)
+
+
 def search_documents(query: str, platform_version: str, scope: str = "syntax") -> str:
     _require_syntax_scope(scope)
     query = (query or "").strip()

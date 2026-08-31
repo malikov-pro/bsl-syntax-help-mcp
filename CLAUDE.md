@@ -33,7 +33,7 @@ opencode — из AGENTS.md.
 7. **XML-entity лимиты уже в `connector/.mvn/jvm.config`** — Maven подхватывает
    их сам (склеивает с MAVEN_OPTS). Дублировать в env не нужно.
 8. **MCP не запускать рядом с HelpSearchServer** — коллизия имён инструментов
-   (`docinfo` / `docsearch`).
+   (`docinfo` / `docsearch` / `docmembers`).
 
 ---
 
@@ -43,7 +43,7 @@ opencode — из AGENTS.md.
 |---|---|---|
 | `docker/mcp/app/db.py`, `app/ingest.py` | WAL-режим, сессии ingest (`begin/batches/commit`), чекпоинт при коммите; ошибки = испорченный корпус | Прогнать полный цикл begin→batches→commit на пустой БД; убедиться, что повторная выгрузка того же слоя идемпотентна |
 | `docker/mcp/app/embedder.py` | Префикс инструкта применяется только к запросам (`EMBED_QUERY_PREFIX`); асимметрия запрос/документ | Не добавлять префикс к документам; проверять `/ready` в `degraded` без Giga |
-| `docker/mcp/app/search.py`, `app/chunking.py` | Гибрид FTS5 + sqlite-vec, разбиение страниц на чанки; влияет релевантность и `doc_id`-ссылки | Сверить `docinfo`/`docsearch` на известных карточках до и после |
+| `docker/mcp/app/search.py`, `app/chunking.py` | Гибрид FTS5 + sqlite-vec, разбиение страниц на чанки; влияет релевантность и `doc_id`-ссылки | Сверить `docinfo`/`docsearch`/`docmembers` на известных карточках до и после |
 | `docker/mcp/app/versions.py` | Слои (`base`, `8.3.25`…`8.5.1`) — контракт с чекбоксами плагина | Новый слой = правка в плагине (`Layers.java`) + README |
 | `Plugin` (`SyntaxHelpPlugin.java`, `ExportJob.java`) | Читает `PlatformDocProvider` (`getTree` + `loadPage`); API зависит от версии EDT | Собрать оба профиля: `bash compile.sh` и `--profile edt-2026.1` |
 
