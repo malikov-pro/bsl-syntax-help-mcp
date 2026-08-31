@@ -180,9 +180,10 @@ public class SyntaxHelpPreferencePage extends PreferencePage implements IWorkben
     }
 
     private void startStatus() {
+	var client = client();
 	runJob(Job.create("Статус syntax-help MCP", monitor -> {
 	    try {
-		showStatus(client().status());
+		showStatus(client.status());
 	    } catch (Exception e) {
 		showStatus("Статус: " + e.getMessage());
 	    }
@@ -199,9 +200,9 @@ public class SyntaxHelpPreferencePage extends PreferencePage implements IWorkben
 		"Удалить в MCP выбранные слои: " + String.join(", ", selected) + "?")) {
 	    return;
 	}
+	var client = client();
 	runJob(Job.create("Очистка слоёв syntax-help MCP", monitor -> {
 	    try {
-		var client = client();
 		var out = new StringBuilder();
 		for (var layer : selected) {
 		    out.append(client.deleteLayer(layer)).append('\n');
@@ -218,9 +219,10 @@ public class SyntaxHelpPreferencePage extends PreferencePage implements IWorkben
 		"Удалить всю базу syntax-help MCP? Это нельзя отменить.")) {
 	    return;
 	}
+	var client = client();
 	runJob(Job.create("Очистка базы syntax-help MCP", monitor -> {
 	    try {
-		showStatus(client().wipeDatabase());
+		showStatus(client.wipeDatabase());
 	    } catch (Exception e) {
 		showStatus("Очистка базы: " + e.getMessage());
 	    }
