@@ -296,13 +296,6 @@ def _type_article_matches(row: Any, needle: str) -> bool:
     return False
 
 
-def _ctor_owner_doc_id(doc_id: str) -> str | None:
-    marker = "/ctors/"
-    if marker not in doc_id:
-        return None
-    return doc_id.rsplit(marker, 1)[0] + ".html"
-
-
 def list_type_members(
     type_name: str,
     platform_version: str,
@@ -336,13 +329,7 @@ def list_type_members(
         owned: list[tuple[str, Any]] = []
         for row in visible.values():
             member_name = row["member_ru"] or row["member_en"] or ""
-            in_type = _owner_matches(row, needle)
-            if not in_type and (row["kind"] or "").lower() == "constructor" and not member_name:
-                owner = visible.get(_ctor_owner_doc_id(row["doc_id"]) or "")
-                if owner is not None and _type_article_matches(owner, needle):
-                    member_name = row["full_name_ru"] or row["full_name_en"] or ""
-                    in_type = bool(member_name)
-            if not in_type or not member_name:
+            if not member_name or not _owner_matches(row, needle):
                 continue
             if not owner_name:
                 candidate = row["object_ru"] or row["object_en"] or ""
