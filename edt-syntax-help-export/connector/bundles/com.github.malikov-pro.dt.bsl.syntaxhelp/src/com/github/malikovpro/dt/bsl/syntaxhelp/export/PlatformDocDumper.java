@@ -220,7 +220,8 @@ public final class PlatformDocDumper {
 	    return false;
 	}
 	var lower = path.toLowerCase(Locale.ROOT);
-	return !lower.contains("/methods/") && !lower.contains("/properties/") && !lower.contains("/events/");
+    return !lower.contains("/methods/") && !lower.contains("/properties/") && !lower.contains("/events/")
+	    && !lower.contains("/ctors/");
     }
 
     private static Names namesOf(PlatformDocTreeNode node) {
