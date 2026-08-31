@@ -1,3 +1,7 @@
+.metadata
+**/bin/
+**/.cache/
+**/.settings/org.eclipse.m2e.core.prefs
 _edt/
 /_source/
 docker/giga/hf-cache/
@@ -10,4 +14,14 @@ docker/mcp/data/
 *.pyc
 .DS_Store
 **/target/
+
+# Учётные данные реджестри EDT (1С) — никогда не коммитить
 edt-syntax-help-export/connector/bom/edt-credentials.env
+
+# Служебные проекты агрегаторов от импорта в Eclipse/PDE (m2e)
+/edt-syntax-help-export/connector/bundles/.project
+/edt-syntax-help-export/connector/features/.project
+/edt-syntax-help-export/connector/repositories/.project
+/edt-syntax-help-export/connector/targets/*/.project
+/edt-syntax-help-export/connector/targets/.settings/
+/edt-syntax-help-export/connector/.metadata/

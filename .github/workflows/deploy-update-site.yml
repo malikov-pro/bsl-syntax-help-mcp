@@ -1,0 +1,97 @@
+name: Deploy Update Site
+
+on:
+  release:
+    types: [published]
+  # релиз создаётся workflow'ом с GITHUB_TOKEN, и его событие "release published"
+  # не триггерит другие workflow — поэтому дублируем триггером по пушу тега
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Актуализация
+        uses: actions/checkout@v4
+        # событие release чекаутит default-ветку — собираем именно тег релиза
+        ref: ${{ github.event.release.tag_name || github.ref }}
+
+      - name: Установка JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          architecture: x64
+          # реджестри пакетов 1С
+          server-id: dt_repository
+          server-username: MAVEN_USERNAME
+          server-password: MAVEN_CENTRAL_TOKEN
+
+      - name: Кеширование m2
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('edt-syntax-help-export/connector/**/pom.xml') }}-${{ hashFiles('edt-syntax-help-export/connector/targets/default/default.target') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      # XML-entity лимиты приходят из connector/.mvn/jvm.config
+      - name: Сборка
+        working-directory: edt-syntax-help-export/connector
+        run: mvn -B clean verify -T 1C -Dtycho.localArtifacts=ignore
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
+
+      - name: Формирование сайта
+        run: |
+          REPO=edt-syntax-help-export/connector/repositories/com.github.malikov-pro.dt.bsl.syntaxhelp.repository/target/repository
+          # p2 в корень Pages → короткий URL установки
+          mkdir -p _site
+          cp -r "$REPO"/. _site/
+          # копия на старом длинном пути: у уже установленных EDT он прописан
+          # в «Доступных сайтах обновления», HTML-редирект p2 не понимает
+          SITE=_site/update/bsl-syntax-help-mcp/latest
+          mkdir -p "$SITE"
+          cp -r "$REPO"/. "$SITE/"
+          QUALIFIER=$(basename "$(ls _site/plugins/com.github.malikov-pro*dt.bsl.syntaxhelp_*.jar | head -n 1)" .jar)
+          cat > _site/index.html <<EOF
+          <!DOCTYPE html>
+          <html lang="ru">
+          <head><meta charset="utf-8"><title>BSL syntax-help export for EDT — update site</title></head>
+          <body>
+            <h1>BSL syntax-help export for EDT</h1>
+            <p>Собранный квалификатор: <strong>${QUALIFIER#*syntaxhelp_}</strong></p>
+            <p>URL для установки (Справка → Установить новое ПО):</p>
+            <pre>https://malikov-pro.github.io/bsl-syntax-help-mcp/</pre>
+            <p><a href="https://github.com/malikov-pro/bsl-syntax-help-mcp">Репозиторий</a></p>
+          </body>
+          </html>
+          EOF
+
+      - name: Настройка Pages
+        uses: actions/configure-pages@v6
+
+      - name: Публикация артефакта
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+      - name: Деплой
+        id: deployment
+        uses: actions/deploy-pages@v5

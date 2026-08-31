@@ -1,0 +1,63 @@
+name: Непрерывная интеграция
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    # secrets доступен только в job-level выражениях; в step-level if его нет
+    env:
+      HAS_SONAR_TOKEN: ${{ secrets.SONAR_TOKEN != '' }}
+
+    steps:
+      - name: Актуализация
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # SonarCloud нужна полная история (SCM/новый код)
+
+      - name: Установка JDK
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          architecture: x64
+          # реджестри пакетов 1С
+          server-id: dt_repository
+          # назначается в сборке
+          server-username: MAVEN_USERNAME
+          # назначается в сборке
+          server-password: MAVEN_CENTRAL_TOKEN # в открытом виде в секретах
+
+      # https://docs.github.com/en/free-pro-team@latest/actions/guides/building-and-testing-java-with-maven
+      - name: Кеширование m2
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/repository
+          key: ${{ runner.os }}-m2-${{ hashFiles('edt-syntax-help-export/connector/**/pom.xml') }}-${{ hashFiles('edt-syntax-help-export/connector/targets/default/default.target') }}
+          restore-keys: ${{ runner.os }}-m2
+
+      - name: Кеширование SonarQube
+        uses: actions/cache@v4
+        with:
+          path: ~/.sonar/cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+
+      # https://edt.1c.ru/dev/ru/docs/plugins/project/build-install-publish-project/
+      # XML-entity лимиты приходят из connector/.mvn/jvm.config
+      - name: Сборка
+        working-directory: edt-syntax-help-export/connector
+        run: mvn verify -Dtycho.localArtifacts=ignore
+        env:
+          MAVEN_USERNAME: ${{ secrets.MAVEN_USERNAME }}
+          MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
+
+      # конфиг сканера — sonar-project.properties; на форк-PR секретов нет — шаг пропустится
+      - name: Анализ SonarCloud
+        if: ${{ env.HAS_SONAR_TOKEN == 'true' }}
+        uses: SonarSource/sonarqube-scan-action@v5
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: https://sonarcloud.io
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
