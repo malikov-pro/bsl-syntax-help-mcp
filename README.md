@@ -11,46 +11,58 @@
 [![Bugs](https://sonarcloud.io/api/project_badges/measure?project=malikov-pro_bsl-syntax-help-mcp&metric=bugs)](https://sonarcloud.io/summary/new_code?id=malikov-pro_bsl-syntax-help-mcp)
 [![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=malikov-pro_bsl-syntax-help-mcp&metric=code_smells)](https://sonarcloud.io/summary/new_code?id=malikov-pro_bsl-syntax-help-mcp)
 
-Docker services that store 1C platform syntax help in SQLite and expose Comol-style MCP tools (`docinfo`, `docsearch`). The EDT plugin dumps the syntax helper into the MCP container over HTTP. Потоки данных — в [CHECK-FLOWS.md](CHECK-FLOWS.md).
+Docker-сервисы, которые хранят синтакс-помощник платформы 1С в SQLite и отдают
+MCP-инструменты в стиле Comol (`docinfo`, `docsearch`). Плагин для 1С:EDT
+выгружает синтакс-помощник в MCP-контейнер по HTTP.
+Потоки данных — в [CHECK-FLOWS.md](CHECK-FLOWS.md).
 
-## Layout
+## Состав
 
-- `docker/giga` — GPU SentenceTransformers OpenAI embeddings (`ai-sage/Giga-Embeddings-instruct`, dim 2048)
-- `docker/mcp` — CPU FastAPI + FastMCP, SQLite FTS5 + sqlite-vec
-- `edt-syntax-help-export` — Tycho plugin for 1С:EDT (HTTP ingest client)
+- `docker/giga` — OpenAI-совместимые эмбеддинги на GPU, SentenceTransformers (`ai-sage/Giga-Embeddings-instruct`, размерность 2048)
+- `docker/mcp` — FastAPI + FastMCP на CPU, SQLite FTS5 + sqlite-vec
+- `edt-syntax-help-export` — Tycho-плагин для 1С:EDT (HTTP-клиент ingest)
 
-## Start
+## Запуск
 
 ```bash
 git clone git@github.com:malikov-pro/bsl-syntax-help-mcp.git
 cd bsl-syntax-help-mcp
 
-docker network create syntax-help   # once; ignore "already exists"
+docker network create syntax-help   # один раз; «already exists» игнорировать
 
 cp docker/giga/.env.example docker/giga/.env
 cp docker/mcp/.env.example docker/mcp/.env
-# set distinct INGEST_TOKEN and MCP_TOKEN in docker/mcp/.env
+# задайте разные INGEST_TOKEN и MCP_TOKEN в docker/mcp/.env
 
 docker compose -f docker/giga/docker-compose.yml up -d --build
 docker compose -f docker/mcp/docker-compose.yml up -d --build
 ```
 
-There is no `depends_on` between the two projects. MCP starts even while Giga is still building or pulling weights.
+`depends_on` между проектами нет: MCP стартует, даже пока Giga ещё собирается
+или тянет веса.
 
-First Giga start is slow: CUDA 12.6 + PyTorch image build, then ~13 GB into `docker/giga/hf-cache/` (`ai-sage/Giga-Embeddings-instruct`). `/health` stays 503 until the model is in VRAM. Compose `start_period` is 30 minutes. RTX 3090 is enough (~8–12 GB VRAM in bf16). `flash_attn` is optional; the server falls back to default attention.
+Первый старт Giga небыстрый: сборка образа CUDA 12.6 + PyTorch, затем ~13 ГБ
+в `docker/giga/hf-cache/` (`ai-sage/Giga-Embeddings-instruct`). `/health`
+держит 503, пока модель не в VRAM. `start_period` в compose — 30 минут.
+RTX 3090 достаточно (~8–12 ГБ VRAM в bf16). `flash_attn` опционален: без него
+сервер откатывается к обычному attention.
 
-## Ports (loopback only)
+## Порты (только loopback)
 
-| Service | Host | Docker DNS |
+| Сервис | На хосте | Docker DNS |
 | --- | --- | --- |
-| Giga embeddings | `http://127.0.0.1:7997` | `http://giga-embeddings:7997` |
+| Giga-эмбеддинги | `http://127.0.0.1:7997` | `http://giga-embeddings:7997` |
 | MCP | `http://127.0.0.1:8004` | — |
 
-`GET /health`, `/ready`, `/status`, and `/` on MCP do not require a token. Ingest and `/admin/*` use `INGEST_TOKEN`. Every `/mcp` method (including GET/DELETE) uses `MCP_TOKEN`.
+`GET /health`, `/ready`, `/status` и `/` на MCP токена не требуют.
+Ingest и `/admin/*` используют `INGEST_TOKEN`. Любой метод `/mcp`
+(включая GET/DELETE) — `MCP_TOKEN`.
 
-`GET /ready` is 200 when FTS search is possible (`ready` or `degraded` if the embedder is down). 503 is only `starting` (empty) or `indexing` (FTS rebuild).
+`GET /ready` возвращает 200, когда возможен FTS-поиск (`ready` или `degraded`,
+если эмбеддер недоступен). 503 — только `starting` (пустая база) или
+`indexing` (пересборка FTS).
 
-## Ingest example
+## Ручная выгрузка (ingest)
 
 ```bash
 set -a && source docker/mcp/.env && set +a
@@ -79,101 +91,123 @@ curl -sS http://127.0.0.1:8004/ingest/commit \
 curl -sS http://127.0.0.1:8004/status
 ```
 
-Search with `platform_version` `8.3.23` (membership layer `base`). Hybrid FTS + embeddings runs when Giga is healthy; FTS-only works in `degraded`.
+Поиск с `platform_version` `8.3.23` (слой членства `base`). Гибрид FTS +
+эмбеддинги работает, когда Giga здоров; в `degraded` остаётся FTS-only.
 
-## Move the SQLite corpus between machines
+## Перенос SQLite-корпуса между машинами
 
-The searchable corpus is **not** in git. It lives on the MCP host as Docker volume files:
+Индексируемый корпус **не** лежит в git. Он живёт на хосте MCP как файлы
+Docker-тома:
 
 - `docker/mcp/data/help.sqlite`
-- `docker/mcp/data/help.sqlite-wal` (may be missing or empty after a clean stop)
+- `docker/mcp/data/help.sqlite-wal` (после чистой остановки может отсутствовать или быть пустым)
 - `docker/mcp/data/help.sqlite-shm`
 
-After a full ingest + embed this is a few GB. Copying it is how you take a precomputed index to another PC **without** re-exporting from EDT or re-embedding on Giga.
+После полной выгрузки и векторизации это несколько ГБ. Копирование — способ
+забрать готовый индекс на другой ПК **без** повторной выгрузки из EDT и
+повторной векторизации на Giga.
 
-Do **not** copy `docker/giga/hf-cache/` for this: the work box still needs its own Giga container for *query* embeddings. The SQLite file already holds document vectors.
+Для этого **не** копируйте `docker/giga/hf-cache/`: рабочей машине всё равно
+нужен собственный контейнер Giga — для векторов *запросов*. Векторы документов
+уже внутри SQLite-файла.
 
-### 1. Snapshot on the source PC
+### 1. Снимок на исходном ПК
 
-Wait until the queue is idle (or accept that leftover `pending` rows will resume on the destination):
+Дождитесь, пока очередь опустеет (или примите, что остаточные `pending`-строки
+доиграют уже на принимающей стороне):
 
 ```bash
 curl -sS http://127.0.0.1:8004/status
-# embed_queue.pending == 0 and error == 0  →  safe to freeze
+# embed_queue.pending == 0 и error == 0  →  можно замораживать
 ```
 
-Stop **MCP only** so SQLite closes the WAL. Leave Giga running if you want; it does not open this file.
+Остановите **только MCP**, чтобы SQLite закрыл WAL. Giga можно не трогать:
+этот файл он не открывает.
 
 ```bash
 docker compose -f docker/mcp/docker-compose.yml stop
 ```
 
-Checkpoint into a single file (needs `sqlite3` on the host):
+Чекпоинт в один файл (нужен `sqlite3` на хосте):
 
 ```bash
 sqlite3 docker/mcp/data/help.sqlite "PRAGMA wal_checkpoint(TRUNCATE);"
 ```
 
-If `sqlite3` is missing, copy all three `help.sqlite*` files together — never the `.sqlite` alone while a `-wal` still has data.
+Если `sqlite3` нет, копируйте все три файла `help.sqlite*` вместе — никогда не
+один `.sqlite`, пока `-wal` ещё содержит данные.
 
-Pack everything SQLite left in `data/` (the main file plus WAL/SHM if present):
+Упакуйте всё, что SQLite оставил в `data/` (основной файл плюс WAL/SHM, если есть):
 
 ```bash
 tar -C docker/mcp/data -cvf help-sqlite.tar help.sqlite*
 ```
 
-Then start MCP again on the source if you still need it:
+Затем поднимите MCP на исходной машине, если он ещё нужен:
 
 ```bash
 docker compose -f docker/mcp/docker-compose.yml start
 ```
 
-Copy `help-sqlite.tar` with whatever you use (`rsync`, USB, scp). The file is local syntax-help text; it is not a 1C infobase, but treat it as internal.
+`help-sqlite.tar` передавайте чем удобно (`rsync`, флешка, scp). Внутри —
+локальный текст синтакс-помощника: не информбаза 1С, но считайте файл
+внутренним.
 
-### 2. Restore on the work PC
+### 2. Восстановление на рабочем ПК
 
-Same repo revision (or at least the same SQLite schema and `EXPECTED_EMBED_DIM=2048`). Create `docker/mcp/.env` on the work box with **that** machine’s `INGEST_TOKEN` / `MCP_TOKEN` — tokens are not inside the database.
+Та же ревизия репозитория (как минимум — та же схема SQLite и
+`EXPECTED_EMBED_DIM=2048`). Создайте на рабочем ПК `docker/mcp/.env` с
+токенами **этой** машины — `INGEST_TOKEN` / `MCP_TOKEN` внутри базы не хранятся.
 
 ```bash
 git clone git@github.com:malikov-pro/bsl-syntax-help-mcp.git
 cd bsl-syntax-help-mcp
-docker network create syntax-help   # ignore "already exists"
+docker network create syntax-help   # «already exists» игнорировать
 
 cp docker/giga/.env.example docker/giga/.env
 cp docker/mcp/.env.example docker/mcp/.env
-# edit tokens
+# впишите токены
 
 mkdir -p docker/mcp/data
-# stop MCP if a first `up` already created an empty help.sqlite
+# остановите MCP, если первый up успел создать пустой help.sqlite
 docker compose -f docker/mcp/docker-compose.yml stop 2>/dev/null || true
 
-tar -C docker/mcp/data -xvf /path/to/help-sqlite.tar
-# destination must contain help.sqlite; include -wal/-shm if they were in the archive
+tar -C docker/mcp/data -xvf /путь/к/help-sqlite.tar
+# в назначении должен оказаться help.sqlite; -wal/-shm включите, если были в архиве
 
 docker compose -f docker/giga/docker-compose.yml up -d --build
 docker compose -f docker/mcp/docker-compose.yml up -d --build
 ```
 
-If MCP was already running with an empty DB, **replace the files while it is stopped**, then `start` / `up -d`. Overwriting `help.sqlite` under a live container will corrupt it.
+Если MCP уже работал с пустой базой, **замените файлы при остановленном
+контейнере**, затем `start` / `up -d`. Перезапись `help.sqlite` под живым
+контейнером его испортит.
 
-Check:
+Проверка:
 
 ```bash
 curl -sS http://127.0.0.1:8004/status
 ```
 
-You should see the same `layers`, `documents`, `chunks`, and `embed_queue.done`. `status` is `ready` when FTS is up; hybrid search needs Giga `up` on this machine (first Giga start still pulls ~13 GB weights).
+Должны совпасть `layers`, `documents`, `chunks` и `embed_queue.done`.
+`status` — `ready`, когда FTS поднят; гибридному поиску нужен поднятый Giga на
+этой машине (первый старт Giga всё равно тянет ~13 ГБ весов).
 
-Cursor MCP URL stays `http://127.0.0.1:8004/mcp` with the **work** `MCP_TOKEN`.
+MCP URL в Cursor не меняется: `http://127.0.0.1:8004/mcp` с токеном
+**рабочей** машины `MCP_TOKEN`.
 
-### Notes
+### Замечания
 
-- Copy only while MCP is stopped. A live copy of WAL SQLite is not a consistent backup.
-- Destination Giga must be the same model (`Giga-Embeddings-instruct`, dim 2048). A different model will not match stored vectors; FTS still works.
-- If `pending` was not zero, the dest MCP worker continues the queue against dest Giga.
-- Do not commit `docker/mcp/data/` or `*.sqlite`.
+- Копируйте только при остановленном MCP: живая копия WAL-SQLite — не
+  консистентный бэкап.
+- Giga на принимающей стороне должен быть той же модели
+  (`Giga-Embeddings-instruct`, размерность 2048). Другая модель не совпадёт
+  с сохранёнными векторами; FTS при этом продолжит работать.
+- Если `pending` не был нулём, воркер MCP на принимающей стороне доиграет
+  очередь против местного Giga.
+- `docker/mcp/data/` и `*.sqlite` не коммитьте.
 
-## Cursor
+## Подключение в Cursor
 
 ```json
 {
@@ -188,25 +222,29 @@ Cursor MCP URL stays `http://127.0.0.1:8004/mcp` with the **work** `MCP_TOKEN`.
 }
 ```
 
-Do not commit real tokens. Do not run this MCP next to HelpSearchServer: the tool names collide.
+Реальные токены не коммитьте. Не запускайте этот MCP рядом с
+HelpSearchServer: имена инструментов пересекаются.
 
-## EDT plugin
+## Плагин для EDT
 
-Tycho layout lives in `edt-syntax-help-export/connector/` (bom / bundles / features / repositories / targets). Default target is EDT **2025.2** + Eclipse **2025-12**; `-Pedt-2026.1` switches the p2 URL. Details: [edt-syntax-help-export/README.md](edt-syntax-help-export/README.md).
+Tycho-раскладка в `edt-syntax-help-export/connector/`
+(bom / bundles / features / repositories / targets). Таргет по умолчанию —
+EDT **2025.2** + Eclipse **2025-12**; `-Pedt-2026.1` переключает p2-URL.
+Подробнее: [edt-syntax-help-export/README.md](edt-syntax-help-export/README.md).
 
-Install from the GitHub Pages update site:
+Установка с сайта обновления (GitHub Pages):
 
-1. `Справка` → `Установить новое ПО`.
-2. URL:
+1. Откройте `Справка` → `Установить новое ПО`.
+2. Введите ссылку:
 
 ```
 https://malikov-pro.github.io/bsl-syntax-help-mcp/
 ```
 
-3. `Добавить`.
-4. Check `BSL syntax-help export for EDT`.
-5. Keep **enabled** `Обращаться во время инсталляции ко всем сайтам обновления для поиска требуемого ПО`.
-6. `Далее` → `Готово`, then restart EDT.
+3. Нажмите `Добавить`.
+4. Установите флажок на `BSL syntax-help export for EDT`.
+5. Убедитесь, что установлен флажок `Обращаться во время инсталляции ко всем сайтам обновления для поиска требуемого ПО`.
+6. `Далее` → `Готово`, затем перезапустите EDT.
 
 ### Установка из архива (без сайта обновления)
 
@@ -215,17 +253,26 @@ https://malikov-pro.github.io/bsl-syntax-help-mcp/
 3. **Снимите** флажок `Обращаться во время инсталляции ко всем сайтам обновления…` — иначе p2 лезет на `services.1c.dev` (ошибка аутентификации) и не находит локальные артефакты (`No repository found containing`).
 4. Выберите `BSL syntax-help export for EDT` → `Далее` → `Готово` → перезапустите EDT.
 
-A closed-EDT p2 director install still works: `bash scripts/deploy-edt.sh` (из `edt-syntax-help-export/`).
+В закрытую EDT установка через p2 director тоже работает:
+`bash scripts/deploy-edt.sh` (из `edt-syntax-help-export/`).
 
-The Pages site is published by `.github/workflows/deploy-update-site.yml` (пуш тега релиза, событие «релиз опубликован» или Actions → Run workflow); p2 лежит в корне Pages, копия на длинном пути `…/update/bsl-syntax-help-mcp/latest/` сохранена для уже установленных EDT. Repo Settings → Pages → Source: GitHub Actions, plus secrets `MAVEN_USERNAME` / `MAVEN_CENTRAL_TOKEN`.
+Сайт публикует `.github/workflows/deploy-update-site.yml` (пуш тега релиза,
+событие «релиз опубликован» или Actions → Run workflow); p2 лежит в корне
+Pages, копия на длинном пути `…/update/bsl-syntax-help-mcp/latest/` сохранена
+для уже установленных EDT. Настройки репозитория → Pages → Source:
+GitHub Actions, плюс секреты `MAVEN_USERNAME` / `MAVEN_CENTRAL_TOKEN`.
 
-In EDT: `Окно` → `Параметры` → `Синтакс-помощник MCP` — URL `http://127.0.0.1:8004`, `INGEST_TOKEN`, layer checkboxes, then **Выгрузить**.
+В EDT: `Окно` → `Параметры` → `Синтакс-помощник MCP` — URL `http://127.0.0.1:8004`,
+`INGEST_TOKEN`, флажки слоёв, затем **Выгрузить**.
 
-## Env
+## Переменные окружения
 
-MCP (`docker/mcp/.env`): `INGEST_TOKEN`, `MCP_TOKEN`, `EMBED_URL=http://giga-embeddings:7997/v1`, `EMBED_MODEL=Giga-Embeddings-instruct`, `EMBED_API_KEY` (empty), `EMBED_QUERY_PREFIX` (instruct text, query side only).
+MCP (`docker/mcp/.env`): `INGEST_TOKEN`, `MCP_TOKEN`,
+`EMBED_URL=http://giga-embeddings:7997/v1`, `EMBED_MODEL=Giga-Embeddings-instruct`,
+`EMBED_API_KEY` (пустой), `EMBED_QUERY_PREFIX` (инструкт, только на стороне запроса).
 
-Giga (`docker/giga/.env`): `MODEL_ID`, optional `HF_TOKEN`. Weights stay in the Giga volume, never in the MCP image.
+Giga (`docker/giga/.env`): `MODEL_ID`, опционально `HF_TOKEN`. Веса живут
+в томе Giga, в образ MCP не попадают.
 
 ## Разработчикам
 
