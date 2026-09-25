@@ -55,12 +55,37 @@ public final class PlatformDocAccess {
 	    // ломаются («injector is not visible here»). Поэтому getInstance(Class)
 	    // зовётся рефлексивно: работает с любой копией Guice, а класс
 	    // PlatformDocProvider у обеих сторон общий (экспортёр пакета один).
-	    provider = (PlatformDocProvider) injector.getClass()
-		    .getMethod("getInstance", Class.class)
-		    .invoke(injector, PlatformDocProvider.class);
+	    //
+	    // Метод ищем на ЭКСПОРТИРУЕМОМ интерфейсе com.google.inject.Injector:
+	    // getMethod на классе-реализации возвращает объявление в
+	    // com.google.inject.internal.InjectorImpl (пакет не экспортирован), и
+	    // invoke из чужого бандла даёт IllegalAccessException.
+	    provider = (PlatformDocProvider) getInstance(injector, PlatformDocProvider.class);
 	} catch (Exception | LinkageError e) {
 	    SyntaxHelpPlugin.logError("Cannot resolve PlatformDocProvider", e);
 	}
 	return provider;
+    }
+
+    /**
+     * Вызов {@code Injector.getInstance(Class)} без зависимости от конкретной
+     * копии Guice. Метод берётся с экспортируемого интерфейса
+     * {@code com.google.inject.Injector}, найденного в иерархии типов
+     * инжектора, — объявление в неэкспортированном
+     * {@code com.google.inject.internal.InjectorImpl} недоступно чужому бандлу.
+     * Если интерфейса в иерархии нет (нестандартная обёртка), остаётся фолбэк
+     * через {@code setAccessible(true)}.
+     */
+    private static Object getInstance(Object injector, Class<?> type) throws Exception {
+	for (var t = injector.getClass(); t != null; t = t.getSuperclass()) {
+	    for (var iface : t.getInterfaces()) {
+		if ("com.google.inject.Injector".equals(iface.getName())) {
+		    return iface.getMethod("getInstance", Class.class).invoke(injector, type);
+		}
+	    }
+	}
+	var method = injector.getClass().getMethod("getInstance", Class.class);
+	method.setAccessible(true);
+	return method.invoke(injector, type);
     }
 }
