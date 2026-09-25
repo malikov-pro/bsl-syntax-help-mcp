@@ -7,7 +7,7 @@
   <parent>
     <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
     <artifactId>parent</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>targets</artifactId>
@@ -17,6 +17,5 @@
 
   <modules>
     <module>default</module>
-    <module>edt-2026.1</module>
   </modules>
 </project>

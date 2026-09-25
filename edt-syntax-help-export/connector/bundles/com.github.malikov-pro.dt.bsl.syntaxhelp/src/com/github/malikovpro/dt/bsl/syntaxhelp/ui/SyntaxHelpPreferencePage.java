@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.eclipse.core.runtime.IStatus;
 import org.eclipse.core.runtime.jobs.IJobChangeEvent;
 import org.eclipse.core.runtime.jobs.Job;
 import org.eclipse.core.runtime.jobs.JobChangeAdapter;
@@ -183,9 +184,9 @@ public class SyntaxHelpPreferencePage extends PreferencePage implements IWorkben
 	var client = client();
 	runJob(Job.create("Статус syntax-help MCP", monitor -> {
 	    try {
-		showStatus(client.status());
+		showStatus(client.formatStatus(client.status()));
 	    } catch (Exception e) {
-		showStatus("Статус: " + e.getMessage());
+		showStatus(client.describe(e));
 	    }
 	}));
     }
@@ -209,7 +210,7 @@ public class SyntaxHelpPreferencePage extends PreferencePage implements IWorkben
 		}
 		showStatus(out.toString().strip());
 	    } catch (Exception e) {
-		showStatus("Очистка слоёв: " + e.getMessage());
+		showStatus(client.describe(e));
 	    }
 	}));
     }
@@ -222,9 +223,10 @@ public class SyntaxHelpPreferencePage extends PreferencePage implements IWorkben
 	var client = client();
 	runJob(Job.create("Очистка базы syntax-help MCP", monitor -> {
 	    try {
-		showStatus(client.wipeDatabase());
+		client.wipeDatabase();
+		showStatus("База очищена. Выполните «Выгрузить» — слои соберутся заново.");
 	    } catch (Exception e) {
-		showStatus("Очистка базы: " + e.getMessage());
+		showStatus(client.describe(e));
 	    }
 	}));
     }
@@ -238,6 +240,13 @@ public class SyntaxHelpPreferencePage extends PreferencePage implements IWorkben
 	job.addJobChangeListener(new JobChangeAdapter() {
 	    @Override
 	    public void done(IJobChangeEvent event) {
+		// Страховка: ошибка джобы, не дошедшая через progress, всё равно
+		// попадает в поле статуса — молчаливых отказов быть не должно.
+		var result = event.getResult();
+		if (result != null && (result.getSeverity() & IStatus.ERROR) != 0
+			&& result.getMessage() != null && !result.getMessage().isBlank()) {
+		    showStatus(result.getMessage());
+		}
 		if (runningJob == job) {
 		    runningJob = null;
 		}

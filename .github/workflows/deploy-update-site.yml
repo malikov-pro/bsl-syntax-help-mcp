@@ -36,7 +36,8 @@ jobs:
       - name: Установка JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          # Tycho 5 требует JDK 21+ для запуска сборки; бандл компилируется в 17
+          java-version: '25'
           distribution: 'temurin'
           architecture: x64
           # реджестри пакетов 1С

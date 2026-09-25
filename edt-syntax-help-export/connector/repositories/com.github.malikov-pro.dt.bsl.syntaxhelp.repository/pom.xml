@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
     <artifactId>repositories</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
   </parent>
 
   <artifactId>com.github.malikov-pro.dt.bsl.syntaxhelp.repository</artifactId>

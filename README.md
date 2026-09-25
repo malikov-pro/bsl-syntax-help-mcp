@@ -281,8 +281,11 @@ HelpSearchServer: имена инструментов пересекаются.
 ## Плагин для EDT
 
 Tycho-раскладка в `edt-syntax-help-export/connector/`
-(bom / bundles / features / repositories / targets). Таргет по умолчанию —
-EDT **2025.2** + Eclipse **2025-12**; `-Pedt-2026.1` переключает p2-URL.
+(bom / bundles / features / repositories / targets). Таргет один —
+EDT **2026.2** + Eclipse **2025-12** с полным набором platform support
+(8.3.8–8.3.27, 8.5.1); готовый артефакт ставится и в EDT **2026.1**
+(байткод 17, один билд на обе EDT — как в
+[EDT-MCP](https://github.com/DitriXNew/EDT-MCP)).
 Подробнее: [edt-syntax-help-export/README.md](edt-syntax-help-export/README.md).
 
 Установка с сайта обновления (GitHub Pages):

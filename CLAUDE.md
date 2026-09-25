@@ -28,8 +28,8 @@ opencode — из AGENTS.md.
 5. **Не перезаписывать `help.sqlite` под живым контейнером MCP** — WAL-SQLite
    портится. Замена файлов только при остановленном MCP.
 6. **Версии пакетов 1С в `MANIFEST.MF` не фиксировать** (`Import-Package` без
-   `version`): один исходник собирается под EDT 2025.2 (Eclipse 2025-12) и
-   EDT 2026.1 (`-Pedt-2026.1`).
+   `version`): один исходник собирается против таргета EDT 2026.2
+   (Eclipse 2025-12) и ставится в EDT 2026.1 и 2026.2 (байткод 17, как в EDT-MCP).
 7. **XML-entity лимиты уже в `connector/.mvn/jvm.config`** — Maven подхватывает
    их сам (склеивает с MAVEN_OPTS). Дублировать в env не нужно.
 8. **MCP не запускать рядом с HelpSearchServer** — коллизия имён инструментов
@@ -45,7 +45,7 @@ opencode — из AGENTS.md.
 | `docker/mcp/app/embedder.py` | Префикс инструкта применяется только к запросам (`EMBED_QUERY_PREFIX`); асимметрия запрос/документ | Не добавлять префикс к документам; проверять `/ready` в `degraded` без Giga |
 | `docker/mcp/app/search.py`, `app/chunking.py` | Гибрид FTS5 + sqlite-vec, разбиение страниц на чанки; влияет релевантность и `doc_id`-ссылки | Сверить `docinfo`/`docsearch`/`docmembers` на известных карточках до и после |
 | `docker/mcp/app/versions.py` | Слои (`base`, `8.3.25`…`8.5.1`) — контракт с чекбоксами плагина | Новый слой = правка в плагине (`Layers.java`) + README |
-| `Plugin` (`SyntaxHelpPlugin.java`, `ExportJob.java`) | Читает `PlatformDocProvider` (`getTree` + `loadPage`); API зависит от версии EDT | Собрать оба профиля: `bash compile.sh` и `--profile edt-2026.1` |
+| `Plugin` (`SyntaxHelpPlugin.java`, `ExportJob.java`) | Читает `PlatformDocProvider` (`getTree` + `loadPage`); API зависит от версии EDT. `PlatformDocAccess` не должен «залипать» на неудаче разрешения — BSL UI стартует лениво | Собрать `bash compile.sh`; проверить установку в EDT 2026.1 и 2026.2 |
 
 ---
 
@@ -71,8 +71,9 @@ opencode — из AGENTS.md.
 - **Ярус 0 — сборка:** `bash compile.sh` → BUILD SUCCESS + свежий квалификатор
   в имени zip. Python-часть отдельно: `docker compose -f docker/mcp/docker-compose.yml up --build`.
 - **Ярус 1 — тесты:** пока нет (план — логика чанкинга/поиска, клиент ingest).
-- **Ярус 2 — живая установка:** p2 в EDT 2025.2 → «Выгрузить» в настройках →
-  `curl /status` (слои и счётчики выросли) → `docsearch` находит известную карточку.
+- **Ярус 2 — живая установка:** p2 в EDT 2026.1 или 2026.2 → «Выгрузить» в
+  настройках → `curl /status` (слои и счётчики выросли) → `docsearch` находит
+  известную карточку.
 - **Ярус 3 — e2e в CI (headless EDT через `p2 director`):** план.
 
 Зелёный нижний ярус НЕ доказывает верхний.

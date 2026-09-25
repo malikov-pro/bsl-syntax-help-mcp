@@ -6,7 +6,7 @@
 
   <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
   <artifactId>bom</artifactId>
-  <version>0.2.0-SNAPSHOT</version>
+  <version>0.3.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>BOM</name>
@@ -16,8 +16,15 @@
   </prerequisites>
 
   <properties>
-    <tycho.version>4.0.5</tycho.version>
-    <tycho.extras.version>4.0.5</tycho.extras.version>
+    <!--
+      Tycho 5 требуется таргету, а не вкусу: бандлы EDT 2026.2 содержат классы
+      мажор-версии 69 (Java 25), и ECJ внутри Tycho 4.0.x (3.36) не умеет их
+      читать. Tycho 5.0.4 несёт ECJ 3.46 и требует, чтобы Maven запускался на
+      JDK 21+ — это JDK, которым ЗАПУСКАЕТСЯ сборка, а не уровень, в который
+      компилируется бандл (он остаётся 17, см. tycho-compiler-plugin).
+    -->
+    <tycho.version>5.0.4</tycho.version>
+    <tycho.extras.version>5.0.4</tycho.extras.version>
 
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
@@ -32,19 +39,7 @@
     <tycho.localArtifacts>ignore</tycho.localArtifacts>
     <tycho.resolver.classic>false</tycho.resolver.classic>
     <tycho.baseline.skip>true</tycho.baseline.skip>
-
-    <!-- default = EDT 2025.2; override with -Pedt-2026.1 -->
-    <edt.target.artifact>default</edt.target.artifact>
   </properties>
-
-  <profiles>
-    <profile>
-      <id>edt-2026.1</id>
-      <properties>
-        <edt.target.artifact>edt-2026.1</edt.target.artifact>
-      </properties>
-    </profile>
-  </profiles>
 
   <build>
     <pluginManagement>
@@ -54,12 +49,21 @@
           <artifactId>target-platform-configuration</artifactId>
           <version>${tycho.version}</version>
           <configuration>
-            <executionEnvironment>JavaSE-17</executionEnvironment>
+            <!--
+              Окружение только РЕЗОЛВА таргета: бандлы EDT 2026.2 требуют
+              osgi.ee JavaSE-25, и резолв в окружении JavaSE-17 их не находит.
+              Во что бандл КОМПИЛИРУЕТСЯ, задаётся отдельно и остаётся 17:
+              tycho-compiler-plugin ниже держит release 17, а MANIFEST.MF —
+              Bundle-RequiredExecutionEnvironment JavaSE-17, поэтому один
+              артефакт ставится и на EDT 2026.1 (Eclipse 4.30 / Java 17),
+              и на EDT 2026.2 (Eclipse 4.38 / Java 25).
+            -->
+            <executionEnvironment>JavaSE-25</executionEnvironment>
             <target>
               <artifact>
                 <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
-                <artifactId>${edt.target.artifact}</artifactId>
-                <version>0.2.0-SNAPSHOT</version>
+                <artifactId>default</artifactId>
+                <version>0.3.0-SNAPSHOT</version>
               </artifact>
             </target>
             <dependency-resolution>
@@ -106,6 +110,12 @@
           <artifactId>tycho-compiler-plugin</artifactId>
           <version>${tycho.version}</version>
           <configuration>
+            <!--
+              Уровень байткода — отдельно от окружения резолва выше: таргет
+              Java 25, бандл — Java 17, поэтому один артефакт грузится и на
+              EDT 2026.1 (там Java 17); release вдобавок запрещает API новее 17.
+            -->
+            <release>17</release>
             <encoding>UTF-8</encoding>
             <strictCompilerTarget>true</strictCompilerTarget>
             <useProjectSettings>true</useProjectSettings>

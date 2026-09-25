@@ -6,6 +6,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 import com.google.gson.JsonArray;
@@ -23,6 +24,11 @@ public final class IngestClient {
     public IngestClient(String baseUrl, String token) {
 	this.baseUrl = trimSlash(baseUrl);
 	this.token = token == null ? "" : token;
+    }
+
+    /** Базовый URL без завершающего слэша — для сообщений пользователю. */
+    public String url() {
+	return baseUrl;
     }
 
     public String begin(String layer) throws IOException, InterruptedException {
@@ -69,6 +75,110 @@ public final class IngestClient {
 	requireOk(response, "/status");
 	return response.body();
     }
+
+    /**
+     * Лёгкая проверка достижимости контейнера перед длинной выгрузкой.
+     * Любой HTTP-ответ (даже 503 «starting») означает «доступен»: падаем
+     * только на сетевых ошибках. Токен не нужен — /status открытый.
+     */
+    public void ping() throws IOException, InterruptedException {
+	var request = HttpRequest.newBuilder(URI.create(baseUrl + "/status")).GET()
+		.timeout(Duration.ofSeconds(10)).build();
+	http.send(request, HttpResponse.BodyHandlers.discarding());
+    }
+
+    /**
+     * Понятный пользователю текст вместо <code>e.getMessage()</code>, который у
+     * сетевых исключений бывает null («Статус:null») или слишком техническим.
+     */
+    public String describe(Throwable failure) {
+	var cause = failure;
+	for (var depth = 0; cause.getCause() != null && cause.getCause() != cause && depth < 8; depth++) {
+	    cause = cause.getCause();
+	}
+	if (cause instanceof java.net.ConnectException) {
+	    return "MCP-контейнер недоступен по адресу " + baseUrl + " (соединение отклонено)."
+		    + " Запустите контейнер: docker compose -f docker/mcp/docker-compose.yml up -d"
+		    + " — и проверьте URL и порт.";
+	}
+	if (cause instanceof java.net.http.HttpTimeoutException) {
+	    return "MCP-контейнер не отвечает по адресу " + baseUrl + " (истёк таймаут)."
+		    + " Проверьте, что контейнер запущен и не занят долгой операцией.";
+	}
+	if (cause instanceof java.net.UnknownHostException) {
+	    return "Не удалось определить адрес «" + cause.getMessage() + "». Проверьте URL контейнера.";
+	}
+	if (cause instanceof javax.net.ssl.SSLException) {
+	    return "Ошибка TLS при обращении к " + baseUrl + " (" + cause.getMessage() + ")."
+		    + " MCP слушает http, а не https.";
+	}
+	var message = chainText(failure);
+	if (failure instanceof IllegalArgumentException) {
+	    return "Некорректный URL «" + baseUrl + "»: " + message;
+	}
+	if (message != null && message.contains("HTTP 401")) {
+	    return message + " — проверьте INGEST_TOKEN (он нужен для «Выгрузить» и «Очистить»).";
+	}
+	return message != null ? message
+		: failure.getClass().getSimpleName()
+			+ (cause.getMessage() == null || cause.getMessage().isBlank() ? ""
+				: ": " + cause.getMessage());
+    }
+
+    /** Ответ /status в виде короткой человекочитаемой сводки; если тело не
+     *  статус-JSON (прокси, страница ошибки) — возвращается как есть. */
+    public String formatStatus(String body) {
+	if (body == null || body.isBlank()) {
+	    return "Пустой ответ.";
+	}
+	try {
+	    var root = JsonParser.parseString(body).getAsJsonObject();
+	    var lines = new ArrayList<String>();
+	    lines.add("Состояние: " + value(root, "status"));
+	    var layers = root.getAsJsonArray("layers");
+	    if (layers != null && !layers.isEmpty()) {
+		var names = new ArrayList<String>();
+		layers.forEach(layer -> names.add(layer.getAsString()));
+		lines.add("Слои: " + String.join(", ", names));
+	    } else {
+		lines.add("Слои: нет (база пуста — выполните «Выгрузить»)");
+	    }
+	    lines.add("Документы: " + value(root, "documents") + ", чанки: " + value(root, "chunks"));
+	    var queue = root.getAsJsonObject("embed_queue");
+	    if (queue != null) {
+		lines.add("Очередь эмбеддингов: готово " + value(queue, "done") + ", в ожидании "
+			+ value(queue, "pending") + ", ошибки " + value(queue, "error"));
+	    }
+	    var dependencies = root.getAsJsonObject("dependencies");
+	    var embedder = dependencies == null ? null : dependencies.getAsJsonObject("embedder");
+	    if (embedder != null) {
+		lines.add("Эмбеддер: " + value(embedder, "status") + " (" + value(embedder, "model") + ")");
+	    }
+	    return String.join("\n", lines);
+	} catch (Exception e) {
+	    return body;
+	}
+    }
+
+    private static String value(JsonObject object, String key) {
+	var item = object.get(key);
+	return item == null || item.isJsonNull() ? "—" : item.getAsString();
+    }
+
+    private static String chainText(Throwable failure) {
+	var parts = new ArrayList<String>();
+	for (var current = failure; current != null && parts.size() < 8; current = current.getCause()) {
+	    var message = current.getMessage();
+	    if (message != null && !message.isBlank()) {
+		parts.add(current.getClass().getSimpleName() + ": " + message.strip());
+	    }
+	    if (current.getCause() == current) {
+		break;
+	    }
+	}
+	return parts.isEmpty() ? null : String.join("; ", parts);
+    }
+
 
     public String deleteLayer(String layer) throws IOException, InterruptedException {
 	var request = authorized(HttpRequest.newBuilder(URI.create(baseUrl + "/admin/layers/" + layer))
