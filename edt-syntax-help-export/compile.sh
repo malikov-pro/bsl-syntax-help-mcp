@@ -103,11 +103,17 @@ if [[ -f "$CRED_ENV" ]]; then
     set -a; source "$CRED_ENV"; set +a
     log "Учётные данные: connector/bom/edt-credentials.env"
 else
-    log "connector/bom/edt-credentials.env не найден — если p2 EDT попросит авторизацию, см. connector/bom/edt-credentials.env.example"
+    log "connector/bom/edt-credentials.env не найден — p2 EDT запрашивается анонимно (публичный репозиторий релизов это позволяет)"
 fi
 
 CMD=(clean verify --batch-mode -T 1C -Dtycho.localArtifacts=ignore)
-[[ -f "$SETTINGS" ]] && CMD+=(-s "$SETTINGS")
+# settings.xml — только с реальными учётными данными: с незаданными
+# ${env.MAVEN_*} литерал «{env.MAVEN_CENTRAL_TOKEN}» матчится Maven как
+# зашифрованный пароль, и сборка падает на отсутствии
+# ~/.m2/settings-security.xml при первом обращении транспорта к кредам.
+if [[ -n "${MAVEN_CENTRAL_TOKEN:-}" && -f "$SETTINGS" ]]; then
+    CMD+=(-s "$SETTINGS")
+fi
 
 log "Запуск: mvn ${CMD[*]} (в connector/)"
 (cd "$CONNECTOR" && "$MVN" "${CMD[@]}")

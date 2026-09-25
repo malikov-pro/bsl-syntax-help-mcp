@@ -30,15 +30,21 @@ public final class ExportJob extends WorkspaceJob {
 
     @Override
     public IStatus runInWorkspace(IProgressMonitor monitor) {
-	var provider = PlatformDocAccess.getProvider();
-	if (provider == null) {
-	    return new Status(IStatus.ERROR, SyntaxHelpPlugin.PLUGIN_ID,
-		    "PlatformDocProvider недоступен. Откройте BSL-редактор и повторите; "
-			    + "подробности — в журнале ошибок (Справка → Журнал ошибок).");
-	}
-	var root = SubMonitor.convert(monitor, "Выгрузка слоёв", layers.size() * 100);
+	var root = SubMonitor.convert(monitor, "Выгрузка слоёв", layers.size() * 100 + 5);
+	root.split(5);
 	var summary = new StringBuilder();
 	try {
+	    // Проверяем достижимость до многочасового чтения дерева справки:
+	    // при недоступном контейнере падаем сразу с понятным текстом.
+	    progress.accept("Проверка доступности MCP (" + client.url() + ")…");
+	    client.ping();
+	    var provider = PlatformDocAccess.getProvider();
+	    if (provider == null) {
+		var message = "PlatformDocProvider недоступен. Откройте BSL-редактор и повторите; "
+			+ "подробности — в журнале ошибок (Справка → Журнал ошибок).";
+		progress.accept(message);
+		return new Status(IStatus.ERROR, SyntaxHelpPlugin.PLUGIN_ID, message);
+	    }
 	    for (var layer : layers) {
 		var layerMonitor = root.split(100);
 		exportLayer(provider, layer, layerMonitor, summary);
@@ -50,8 +56,9 @@ public final class ExportJob extends WorkspaceJob {
 	    return Status.CANCEL_STATUS;
 	} catch (Exception e) {
 	    SyntaxHelpPlugin.logError("Ошибка выгрузки синтакс-помощника", e);
-	    progress.accept("Ошибка: " + e.getMessage());
-	    return new Status(IStatus.ERROR, SyntaxHelpPlugin.PLUGIN_ID, e.getMessage(), e);
+	    var message = "Ошибка: " + client.describe(e);
+	    progress.accept(message);
+	    return new Status(IStatus.ERROR, SyntaxHelpPlugin.PLUGIN_ID, message, e);
 	}
     }
 
