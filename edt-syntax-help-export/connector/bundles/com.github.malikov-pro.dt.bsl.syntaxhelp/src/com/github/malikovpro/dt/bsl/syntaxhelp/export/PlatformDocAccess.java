@@ -5,7 +5,6 @@ import org.osgi.framework.Bundle;
 
 import com._1c.g5.v8.dt.platform.doc.PlatformDocProvider;
 import com.github.malikovpro.dt.bsl.syntaxhelp.SyntaxHelpPlugin;
-import com.google.inject.Injector;
 
 /**
  * Resolves {@link PlatformDocProvider} through the BSL UI Guice injector.
@@ -50,11 +49,15 @@ public final class PlatformDocAccess {
 			+ " is not registered yet; open a BSL editor and retry");
 		return null;
 	    }
-	    if (injector instanceof Injector guiceInjector) {
-		provider = guiceInjector.getInstance(PlatformDocProvider.class);
-	    } else {
-		SyntaxHelpPlugin.logWarning("BSL injector is not a com.google.inject.Injector visible here");
-	    }
+	    // com.google.inject в EDT экспортируют несколько бандлов (7.0.0 и 7.0.2):
+	    // bsl.ui берёт свою копию через Require-Bundle, а наш Import-Package
+	    // может завестись на другую — тогда instanceof и типизированный вызов
+	    // ломаются («injector is not visible here»). Поэтому getInstance(Class)
+	    // зовётся рефлексивно: работает с любой копией Guice, а класс
+	    // PlatformDocProvider у обеих сторон общий (экспортёр пакета один).
+	    provider = (PlatformDocProvider) injector.getClass()
+		    .getMethod("getInstance", Class.class)
+		    .invoke(injector, PlatformDocProvider.class);
 	} catch (Exception | LinkageError e) {
 	    SyntaxHelpPlugin.logError("Cannot resolve PlatformDocProvider", e);
 	}
