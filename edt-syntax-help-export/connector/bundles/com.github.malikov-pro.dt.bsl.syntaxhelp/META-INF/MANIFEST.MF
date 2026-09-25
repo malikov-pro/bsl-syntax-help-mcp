@@ -16,5 +16,4 @@ Automatic-Module-Name: com.github.malikov-pro.dt.bsl.syntaxhelp
 Bundle-ActivationPolicy: lazy
 Import-Package: com._1c.g5.v8.dt.platform.doc,
  com._1c.g5.v8.dt.platform.version,
- com.google.gson,
- com.google.inject
+ com.google.gson
