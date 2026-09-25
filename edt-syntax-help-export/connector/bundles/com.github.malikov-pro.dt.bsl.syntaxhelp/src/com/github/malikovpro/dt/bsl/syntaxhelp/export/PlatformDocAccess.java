@@ -10,6 +10,12 @@ import com.google.inject.Injector;
 /**
  * Resolves {@link PlatformDocProvider} through the BSL UI Guice injector.
  * The activator package is not exported, so the class is loaded via the bundle.
+ *
+ * <p>Resolution is attempted on every call and a failed attempt is never
+ * latched: the BSL UI plugin starts lazily (first BSL editor or first class
+ * load), and an early failure — plugin not started yet, provider not
+ * provisionable yet — fixes itself later. Latching the failure here made the
+ * «Откройте BSL-редактор и повторите» advice impossible to satisfy (issue #3).
  */
 public final class PlatformDocAccess {
     private static final String BSL_UI_BUNDLE = "com._1c.g5.v8.dt.bsl.ui";
@@ -17,13 +23,12 @@ public final class PlatformDocAccess {
     private static final String BSL_LANGUAGE_ID = "com._1c.g5.v8.dt.bsl.Bsl";
 
     private static PlatformDocProvider provider;
-    private static boolean resolved;
 
     private PlatformDocAccess() {
     }
 
     public static synchronized PlatformDocProvider getProvider() {
-	if (resolved) {
+	if (provider != null) {
 	    return provider;
 	}
 	try {
@@ -40,17 +45,19 @@ public final class PlatformDocAccess {
 	    }
 	    Object injector = activatorClass.getMethod("getInjector", String.class).invoke(activator,
 		    BSL_LANGUAGE_ID);
-	    if (injector instanceof Injector) {
-		provider = ((Injector) injector).getInstance(PlatformDocProvider.class);
+	    if (injector == null) {
+		SyntaxHelpPlugin.logWarning("BSL injector for " + BSL_LANGUAGE_ID
+			+ " is not registered yet; open a BSL editor and retry");
+		return null;
+	    }
+	    if (injector instanceof Injector guiceInjector) {
+		provider = guiceInjector.getInstance(PlatformDocProvider.class);
 	    } else {
 		SyntaxHelpPlugin.logWarning("BSL injector is not a com.google.inject.Injector visible here");
 	    }
 	} catch (Exception | LinkageError e) {
 	    SyntaxHelpPlugin.logError("Cannot resolve PlatformDocProvider", e);
-	    resolved = true;
-	    return provider;
 	}
-	resolved = true;
 	return provider;
     }
 }

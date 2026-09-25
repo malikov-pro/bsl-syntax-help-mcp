@@ -19,7 +19,10 @@ jobs:
       - name: Установка JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          # Tycho 5 требует JDK 21+ для запуска сборки: таргет EDT 2026.2 несёт
+          # классы Java 25. Сам бандл компилируется в байткод 17 (bom/pom.xml),
+          # поэтому артефакт грузится и на EDT 2026.1.
+          java-version: '25'
           distribution: 'temurin'
           architecture: x64
           # реджестри пакетов 1С

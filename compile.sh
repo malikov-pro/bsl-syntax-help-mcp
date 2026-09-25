@@ -4,9 +4,7 @@
 # CI (.github/workflows/ci.yml): mvn clean verify, затем печатает путь к
 # готовому p2-артефакту (zip) для установки в EDT.
 #
-# Использование:
-#   bash compile.sh                     # сборка + упаковка p2 (EDT 2025.2)
-#   bash compile.sh --profile edt-2026.1
+# Таргет один — EDT 2026.2; артефакт ставится в EDT 2026.1 и 2026.2.
 #
 # Docker-сервисы (giga, mcp) собираются отдельно:
 #   docker compose -f docker/giga/docker-compose.yml up -d --build

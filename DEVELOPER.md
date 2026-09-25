@@ -16,8 +16,8 @@ Docker-сервисы (MCP-поиск по синтакс-помощнику 1С
 
 ## Требования
 
-* JDK 17+
-* Maven 3.9+ (Tycho 4.0.5 на 3.8.x падает «requires Maven version 3.9.0»)
+* JDK **21+** для сборки (лучше 25: Tycho 5 читает классы Java 25 из таргета EDT 2026.2; сам бандл компилируется в байткод 17)
+* Maven 3.9+ (Tycho 5.0.4 требует запуска на JDK 21+)
 * Доступ к репозиторию EDT (credentials в `edt-syntax-help-export/connector/bom/edt-credentials.env`)
 * Для MCP-стека: Docker + NVIDIA GPU (только для `docker/giga`; MCP — CPU)
 
@@ -37,7 +37,7 @@ Docker-сервисы (MCP-поиск по синтакс-помощнику 1С
 ```bash
 # 1. В develop поднять версию (обновит pom, MANIFEST и feature):
 cd edt-syntax-help-export/connector
-mvn org.eclipse.tycho:tycho-versions-plugin:4.0.5:set-version -DnewVersion=0.2.0-SNAPSHOT -DgenerateBackupPoms=false
+mvn org.eclipse.tycho:tycho-versions-plugin:5.0.4:set-version -DnewVersion=0.3.0-SNAPSHOT -DgenerateBackupPoms=false
 # 2. bom — родитель ВНЕ реактора, set-version его не трогает. Вручную поставить
 #    0.2.0-SNAPSHOT в connector/bom/pom.xml (<version> bom'а) и в <parent><version>
 #    файла connector/pom.xml.
@@ -76,28 +76,34 @@ https://malikov-pro.github.io/bsl-syntax-help-mcp/
 
 ## Целевая платформа в EDT
 
-По умолчанию сборка идёт против **EDT 2025.2 + Eclipse 2025-12**
-(`edt-syntax-help-export/connector/targets/default/default.target`);
-профиль `-Pedt-2026.1` переключает p2-URL на EDT 2026.1.
+Сборка идёт против одного таргета **EDT 2026.2 + Eclipse 2025-12**
+(`edt-syntax-help-export/connector/targets/default/default.target`) с полным
+набором platform support (8.3.8–8.3.27, 8.5.1) — как в
+[EDT-MCP](https://github.com/DitriXNew/EDT-MCP). Профилей больше нет:
+бандл компилируется в байткод 17, поэтому готовый артефакт ставится
+и в EDT **2026.1**, и в EDT **2026.2** — одна сборка на обе версии.
 
-`Reload Target Platform` есть только в **EDT для разработки плагинов** (PDE). В обычном EDT с конфигурациями 1С этого пункта нет: туда ставится уже собранный p2 (`Справка` → `Установить новое ПО`).
+`Reload Target Platform` есть только в **EDT для разработки плагинов**
+(PDE). В обычном EDT с конфигурациями 1С этого пункта нет: туда ставится
+уже собранный p2 (`Справка` → `Установить новое ПО`).
 
 В PDE-workspace:
 
 1. Вид **Project Explorer** (не Package Explorer).
-2. Проект `default` (в `edt-syntax-help-export/connector/targets/default/`) → файл `default.target`. Для 2026.1 — `edt-2026.1/edt-2026.1.target`.
+2. Проект `default` (в `edt-syntax-help-export/connector/targets/default/`) → файл `default.target`.
 3. Либо **Окно → Параметры → Plug-in Development → Target Platform** → **Add** → **Workspace**.
 
 ## Локальная сборка
 
 > Канонический путь — скрипт в корне репозитория: он делегирует в
 > `edt-syntax-help-export/compile.sh` (entity-лимиты берёт из
-> `connector/.mvn/jvm.config`) и печатает путь к p2-zip.
+> `connector/.mvn/jvm.config`, сам находит JDK 21+ и Maven) и печатает путь
+> к готовому p2-zip.
 
 ```bash
 bash compile.sh
-# профиль EDT 2026.1:
-bash compile.sh --profile edt-2026.1
+# свои JDK/Maven:
+bash compile.sh --java-home ~/tools/jdk-25.0.4.1+1 --maven-home ~/tools/apache-maven-3.9.9
 ```
 
 Ниже — те же шаги вручную (например, для Windows без bash):
@@ -140,5 +146,5 @@ docker compose -f docker/mcp/docker-compose.yml up -d --build
 
 * **Ярус 0 — сборка:** `bash compile.sh` → BUILD SUCCESS, свежий квалификатор в имени p2-zip.
 * **Ярус 1 — тесты:** юнит-тестов пока нет; план — чистая логика плагина (чанкинг карточек, клиент ingest) и Python-приложения (chunking, search).
-* **Ярус 2 — живая установка:** установить p2 в EDT 2025.2, в `Окно → Параметры → Синтакс-помощник MCP` указать URL/`INGEST_TOKEN` и выполнить реальную «Выгрузить»; затем `docsearch` через MCP.
+* **Ярус 2 — живая установка:** установить p2 в EDT 2026.1 или 2026.2, в `Окно → Параметры → Синтакс-помощник MCP` указать URL/`INGEST_TOKEN` и выполнить реальную «Выгрузить»; затем `docsearch` через MCP.
 * **Ярус 3 — e2e в CI:** план; headless EDT через `p2 director`.

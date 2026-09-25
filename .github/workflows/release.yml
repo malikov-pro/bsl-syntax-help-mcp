@@ -22,7 +22,8 @@ jobs:
       - name: Установка JDK
         uses: actions/setup-java@v4
         with:
-          java-version: '17'
+          # Tycho 5 требует JDK 21+ для запуска сборки; бандл компилируется в 17
+          java-version: '25'
           distribution: 'temurin'
           architecture: x64
           # реджестри пакетов 1С
@@ -49,7 +50,7 @@ jobs:
           if ! grep -q "<version>${TAG}-SNAPSHOT</version>" pom.xml; then
             echo "pom в ${TAG} версии ${TAG}-SNAPSHOT — сначала поднимите версию в develop/main"; exit 1
           fi
-          mvn -B org.eclipse.tycho:tycho-versions-plugin:4.0.5:set-version \
+          mvn -B org.eclipse.tycho:tycho-versions-plugin:5.0.4:set-version \
             -DnewVersion="${TAG}" -DgenerateBackupPoms=false
           # bom — родитель вне реактора, set-version его не обновляет
           for f in bom/pom.xml pom.xml; do

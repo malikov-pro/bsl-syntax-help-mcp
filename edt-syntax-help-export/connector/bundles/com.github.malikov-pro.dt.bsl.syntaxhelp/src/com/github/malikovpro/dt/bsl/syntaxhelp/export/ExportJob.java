@@ -33,7 +33,8 @@ public final class ExportJob extends WorkspaceJob {
 	var provider = PlatformDocAccess.getProvider();
 	if (provider == null) {
 	    return new Status(IStatus.ERROR, SyntaxHelpPlugin.PLUGIN_ID,
-		    "PlatformDocProvider недоступен. Откройте BSL-редактор и повторите.");
+		    "PlatformDocProvider недоступен. Откройте BSL-редактор и повторите; "
+			    + "подробности — в журнале ошибок (Справка → Журнал ошибок).");
 	}
 	var root = SubMonitor.convert(monitor, "Выгрузка слоёв", layers.size() * 100);
 	var summary = new StringBuilder();

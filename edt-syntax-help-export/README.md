@@ -6,7 +6,9 @@ Tycho-плагин для 1С:EDT. Читает синтакс-помощник 
 
 ## Сборка
 
-Нужны JDK **17**, Maven **3.9+**, доступ к p2 EDT (`connector/bom/edt-credentials.env`, файл в git не кладётся).
+Нужны JDK **21+** (лучше 25 — Tycho 5 читает классы Java 25 из таргета),
+Maven **3.9+**, доступ к p2 EDT (`connector/bom/edt-credentials.env`, файл в git не кладётся).
+Сам бандл компилируется в байткод 17, поэтому готовый артефакт ставится и в EDT 2026.1, и в EDT 2026.2.
 
 ```bash
 # из корня репозитория (канонический путь):
@@ -16,8 +18,6 @@ cp connector/bom/edt-credentials.env.example connector/bom/edt-credentials.env
 # заполните MAVEN_USERNAME / MAVEN_CENTRAL_TOKEN (учётка edt.1c.ru)
 
 bash compile.sh
-# EDT 2026.1:
-bash compile.sh --profile edt-2026.1
 ```
 
 Или вручную:
@@ -56,7 +56,7 @@ https://malikov-pro.github.io/bsl-syntax-help-mcp/update/bsl-syntax-help-mcp/lat
 ```bash
 bash scripts/deploy-edt.sh
 # своя инсталляция:
-bash scripts/deploy-edt.sh --edt "$HOME/.local/share/1C/1cedtstart/installations/1C_EDT 2025.2/1cedt"
+bash scripts/deploy-edt.sh --edt "$HOME/.local/share/1C/1cedtstart/installations/1C_EDT 2026.1/1cedt"
 ```
 
 ### Публикация сайта обновления
