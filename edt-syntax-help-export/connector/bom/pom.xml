@@ -6,7 +6,7 @@
 
   <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
   <artifactId>bom</artifactId>
-  <version>0.2.0-SNAPSHOT</version>
+  <version>0.3.0-SNAPSHOT</version>
   <packaging>pom</packaging>
 
   <name>BOM</name>
@@ -63,7 +63,7 @@
               <artifact>
                 <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
                 <artifactId>default</artifactId>
-                <version>0.2.0-SNAPSHOT</version>
+                <version>0.3.0-SNAPSHOT</version>
               </artifact>
             </target>
             <dependency-resolution>

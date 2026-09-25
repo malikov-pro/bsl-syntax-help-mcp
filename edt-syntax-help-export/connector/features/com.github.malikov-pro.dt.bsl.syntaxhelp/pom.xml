@@ -8,7 +8,7 @@
   <parent>
     <groupId>com.github.malikov-pro.dt.bsl.syntaxhelp</groupId>
     <artifactId>features</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.3.0-SNAPSHOT</version>
   </parent>
 
   <!-- Distinct groupId: Tycho needs artifactId = feature id, which matches the bundle BSN. -->
