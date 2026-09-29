@@ -62,6 +62,25 @@ Ingest и `/admin/*` используют `INGEST_TOKEN`. Любой метод 
 если эмбеддер недоступен). 503 — только `starting` (пустая база) или
 `indexing` (пересборка FTS).
 
+## Образ в Docker Hub
+
+MCP-сервис публикуется в Docker Hub workflow-ом `docker-publish.yml`:
+[`malikovpro/bsl-syntax-help-mcp`](https://hub.docker.com/r/malikovpro/bsl-syntax-help-mcp).
+Теги: `X.Y.Z` — выходит вместе с релизом плагина (тот же тег), `latest`,
+`sha-<хеш>` — сборка конкретного коммита.
+
+Обновление развёрнутого сервиса без локальной сборки:
+
+```bash
+docker compose -f docker/mcp/docker-compose.yml pull mcp
+docker compose -f docker/mcp/docker-compose.yml up -d
+```
+
+`docker-compose.yml` по умолчанию тянет `latest`; для фиксации версии укажите
+в нём тег `X.Y.Z`. Локальная сборка (`up -d --build`) по-прежнему работает и
+перезаписывает локальный тег. Giga-эмбеддинги в реестр не публикуются —
+только локальная сборка (`docker/giga`).
+
 ## Ручная выгрузка (ingest)
 
 ```bash

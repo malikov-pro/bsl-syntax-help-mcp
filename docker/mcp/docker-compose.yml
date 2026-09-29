@@ -5,7 +5,7 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-    image: syntax-help-mcp:local
+    image: malikovpro/bsl-syntax-help-mcp:latest
     container_name: syntax-help-mcp
     restart: unless-stopped
     env_file:
