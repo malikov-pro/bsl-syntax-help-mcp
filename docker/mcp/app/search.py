@@ -127,17 +127,42 @@ def lookup_document(name: str, platform_version: str, scope: str = "syntax") -> 
             raise SearchError(str(exc), exc.loaded_layers) from exc
         visible = _visible_docs(conn, resolved.membership_layer, platform_version)
         needle = name.strip().casefold()
-        match_id = None
+        # Приоритет совпадений: 0 — полное имя статьи, 1 — алиас, 2 — имя типа-
+        # владельца, 3 — имя члена. Иначе «ТекстовыйДокумент» ловит одноимённый
+        # член перечисления вместо статьи типа.
+        best: tuple[int, int, str] | None = None
         for doc_id, row in visible.items():
-            names = [row["full_name_ru"], row["full_name_en"], row["object_ru"], row["member_ru"]]
-            aliases = [
-                item["alias"]
-                for item in conn.execute("SELECT alias FROM aliases WHERE doc_id = ?", (doc_id,)).fetchall()
-            ]
-            names.extend(aliases)
-            if any(value and value.casefold() == needle for value in names):
-                match_id = doc_id
-                break
+            field_match = min(
+                (
+                    priority
+                    for priority, value in (
+                        (0, row["full_name_ru"]),
+                        (0, row["full_name_en"]),
+                        (2, row["object_ru"]),
+                        (2, row["object_en"]),
+                        (3, row["member_ru"]),
+                        (3, row["member_en"]),
+                    )
+                    if value and value.strip().casefold() == needle
+                ),
+                default=None,
+            )
+            if field_match is None:
+                aliases = [
+                    item["alias"]
+                    for item in conn.execute("SELECT alias FROM aliases WHERE doc_id = ?", (doc_id,)).fetchall()
+                ]
+                if any(alias.strip().casefold() == needle for alias in aliases):
+                    field_match = 1
+            if field_match is None:
+                continue
+            kind_penalty = 0 if (row["kind"] or "").lower() == "type" else 1
+            candidate = (field_match, kind_penalty, doc_id)
+            if best is None or candidate < best:
+                best = candidate
+        if best is None:
+            return f"Document {name!r} was not found for platform_version {platform_version}."
+        match_id = best[2]
         if match_id is None:
             return f"Document {name!r} was not found for platform_version {platform_version}."
         bodies = _body_map(conn, [match_id], resolved.body_layers)
