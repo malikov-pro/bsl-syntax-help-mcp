@@ -1,0 +1,72 @@
+name: Docker MCP
+
+# Публикация образа MCP-сервиса в Docker Hub: malikovpro/bsl-syntax-help-mcp.
+# Теги образа: X.Y.Z (версия из тега релиза или из ручного запуска), latest,
+# sha-<7 символов>. Тег релиза одновременно собирает и p2 (release.yml), и образ.
+#
+# Требуются секреты репозитория: DOCKERHUB_USERNAME, DOCKERHUB_TOKEN.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Версия образа вида X.Y.Z (например 0.3.0)'
+        required: true
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+permissions:
+  contents: read
+
+env:
+  IMAGE: malikovpro/bsl-syntax-help-mcp
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Актуализация
+        uses: actions/checkout@v5
+
+      - name: Версия образа
+        id: ver
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            V="${{ inputs.version }}"
+          else
+            V="${GITHUB_REF_NAME}"
+          fi
+          if ! [[ "$V" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Версия «$V» не вида X.Y.Z"; exit 1
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "sha=sha-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+
+      - name: Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Вход в Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Сборка и публикация
+        uses: docker/build-push-action@v6
+        with:
+          context: docker/mcp
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:${{ steps.ver.outputs.version }}
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ steps.ver.outputs.sha }}
+          labels: |
+            org.opencontainers.image.title=bsl-syntax-help-mcp
+            org.opencontainers.image.description=MCP-поиск по синтакс-помощнику платформы 1С: docinfo, docsearch, docmembers
+            org.opencontainers.image.version=${{ steps.ver.outputs.version }}
+            org.opencontainers.image.source=https://github.com/malikov-pro/bsl-syntax-help-mcp
+            org.opencontainers.image.licenses=AGPL-3.0
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
